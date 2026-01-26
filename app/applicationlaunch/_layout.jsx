@@ -1,12 +1,13 @@
 import { Stack } from "expo-router";
 
-export default function RootLayout() {
+const ApplicationLaunchLayout = () => {
   return (
     <Stack
       screenOptions={{
         headerShown: false,
-        animation: "fade",
       }}
     />
   );
-}
+};
+
+export default ApplicationLaunchLayout;

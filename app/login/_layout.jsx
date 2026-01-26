@@ -1,12 +1,13 @@
 import { Stack } from "expo-router";
 
-export default function RootLayout() {
+const LoginLayout = () => {
   return (
     <Stack
       screenOptions={{
         headerShown: false,
-        animation: "fade",
       }}
     />
   );
-}
+};
+
+export default LoginLayout;
