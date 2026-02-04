@@ -2,17 +2,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Logo from "../components/Logo";
+import { signUp } from "../utils/auth";
 
 export default function SignUpScreen() {
   const [name, setName] = useState("");
@@ -21,20 +22,51 @@ export default function SignUpScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isSigningUp, setIsSigningUp] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSignUp = () => {
-    // TODO: Implement sign up logic
-    console.log("Sign up:", { name, email, password });
-    
-    // Validate passwords match
-    if (password !== confirmPassword) {
-      // TODO: Show error message
-      console.log("Passwords do not match");
+  const handleSignUp = async () => {
+    // Validate inputs
+    if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
+      setError("Please fill in all fields");
       return;
     }
-    
-    // Navigate to login or main app after successful signup
-    // router.replace("/login");
+
+    // Validate passwords match
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    // Validate password strength
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long");
+      return;
+    }
+
+    setIsSigningUp(true);
+    setError("");
+
+    try {
+      // Sign up with Supabase
+      const { user, error: authError } = await signUp(email.trim(), password, name.trim());
+
+      if (authError) {
+        setError(authError.message || "Failed to create account. Please try again.");
+        setIsSigningUp(false);
+        return;
+      }
+
+      if (user) {
+        // Navigate to login after successful signup
+        router.replace("/login");
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+      console.error("Sign up error:", err);
+    } finally {
+      setIsSigningUp(false);
+    }
   };
 
   return (
@@ -75,7 +107,10 @@ export default function SignUpScreen() {
                     placeholder="John Doe"
                     placeholderTextColor="#9CA3AF"
                     value={name}
-                    onChangeText={setName}
+                    onChangeText={(text) => {
+                      setName(text);
+                      setError("");
+                    }}
                     autoCapitalize="words"
                     autoCorrect={false}
                   />
@@ -91,7 +126,10 @@ export default function SignUpScreen() {
                     placeholder="your.email@example.com"
                     placeholderTextColor="#9CA3AF"
                     value={email}
-                    onChangeText={setEmail}
+                    onChangeText={(text) => {
+                      setEmail(text);
+                      setError("");
+                    }}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -108,7 +146,10 @@ export default function SignUpScreen() {
                     placeholder="••••••••"
                     placeholderTextColor="#6B7280"
                     value={password}
-                    onChangeText={setPassword}
+                    onChangeText={(text) => {
+                      setPassword(text);
+                      setError("");
+                    }}
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -135,7 +176,10 @@ export default function SignUpScreen() {
                     placeholder="••••••••"
                     placeholderTextColor="#6B7280"
                     value={confirmPassword}
-                    onChangeText={setConfirmPassword}
+                    onChangeText={(text) => {
+                      setConfirmPassword(text);
+                      setError("");
+                    }}
                     secureTextEntry={!showConfirmPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -153,13 +197,23 @@ export default function SignUpScreen() {
                 </View>
               </View>
 
+              {/* Error Message */}
+              {error ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              ) : null}
+
               {/* Sign Up Button */}
               <TouchableOpacity
-                style={styles.signUpButton}
+                style={[styles.signUpButton, isSigningUp && styles.signUpButtonDisabled]}
                 onPress={handleSignUp}
                 activeOpacity={0.8}
+                disabled={isSigningUp}
               >
-                <Text style={styles.signUpButtonText}>SIGN UP</Text>
+                <Text style={styles.signUpButtonText}>
+                  {isSigningUp ? "CREATING ACCOUNT..." : "SIGN UP"}
+                </Text>
               </TouchableOpacity>
 
               {/* Login Link */}
@@ -244,6 +298,18 @@ const styles = StyleSheet.create({
   inputIcon: {
     padding: 4,
   },
+  errorContainer: {
+    backgroundColor: "#FEE2E2",
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: "#DC2626",
+    fontSize: 14,
+    textAlign: "center",
+  },
   signUpButton: {
     backgroundColor: "#4F46E5",
     borderRadius: 12,
@@ -252,6 +318,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 8,
     marginBottom: 24,
+  },
+  signUpButtonDisabled: {
+    backgroundColor: "#6B7280",
+    opacity: 0.6,
   },
   signUpButtonText: {
     fontSize: 16,

@@ -2,17 +2,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Logo from "../../components/Logo";
+import { signIn } from "../../utils/auth";
 import { clearCredentials, loadCredentials, saveCredentials } from "../../utils/storage";
 
 export default function LoginScreen() {
@@ -21,6 +22,8 @@ export default function LoginScreen() {
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [error, setError] = useState("");
 
   // Load saved credentials on mount
   useEffect(() => {
@@ -43,20 +46,42 @@ export default function LoginScreen() {
   }, []);
 
   const handleSignIn = async () => {
-    // TODO: Implement actual authentication logic
-    console.log("Sign in:", { email, password, rememberMe });
-    
-    // Save or clear credentials based on remember me
-    if (rememberMe) {
-      await saveCredentials(email, password);
-      console.log("Credentials saved for quick access");
-    } else {
-      await clearCredentials();
-      console.log("Credentials cleared");
+    // Validate inputs
+    if (!email.trim() || !password.trim()) {
+      setError("Please fill in all fields");
+      return;
     }
-    
-    // Navigate to main app after successful login
-    // router.replace("/(tabs)");
+
+    setIsSigningIn(true);
+    setError("");
+
+    try {
+      // Sign in with Supabase
+      const { user, error: authError } = await signIn(email.trim(), password);
+
+      if (authError) {
+        setError(authError.message || "Failed to sign in. Please check your credentials.");
+        setIsSigningIn(false);
+        return;
+      }
+
+      if (user) {
+        // Save or clear credentials based on remember me
+        if (rememberMe) {
+          await saveCredentials(email, password);
+        } else {
+          await clearCredentials();
+        }
+
+        // Navigate to main app after successful login
+        router.replace("/(tabs)");
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+      console.error("Sign in error:", err);
+    } finally {
+      setIsSigningIn(false);
+    }
   };
 
   const handleRememberMeToggle = () => {
@@ -104,7 +129,10 @@ export default function LoginScreen() {
                     placeholder="your.email@example.com"
                     placeholderTextColor="#9CA3AF"
                     value={email}
-                    onChangeText={setEmail}
+                    onChangeText={(text) => {
+                      setEmail(text);
+                      setError("");
+                    }}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -124,7 +152,10 @@ export default function LoginScreen() {
                     placeholder="••••••••"
                     placeholderTextColor="#6B7280"
                     value={password}
-                    onChangeText={setPassword}
+                    onChangeText={(text) => {
+                      setPassword(text);
+                      setError("");
+                    }}
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -156,13 +187,23 @@ export default function LoginScreen() {
                 <Text style={styles.rememberMeText}>Remember me</Text>
               </TouchableOpacity>
 
+              {/* Error Message */}
+              {error ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              ) : null}
+
               {/* Sign In Button */}
               <TouchableOpacity
-                style={styles.signInButton}
+                style={[styles.signInButton, isSigningIn && styles.signInButtonDisabled]}
                 onPress={handleSignIn}
                 activeOpacity={0.8}
+                disabled={isSigningIn}
               >
-                <Text style={styles.signInButtonText}>SIGN IN</Text>
+                <Text style={styles.signInButtonText}>
+                  {isSigningIn ? "SIGNING IN..." : "SIGN IN"}
+                </Text>
               </TouchableOpacity>
 
               {/* Links Section */}
@@ -271,6 +312,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#FFFFFF",
   },
+  errorContainer: {
+    backgroundColor: "#FEE2E2",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: "#DC2626",
+    fontSize: 14,
+    textAlign: "center",
+  },
   signInButton: {
     backgroundColor: "#4F46E5",
     borderRadius: 12,
@@ -278,6 +330,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 24,
+  },
+  signInButtonDisabled: {
+    backgroundColor: "#6B7280",
+    opacity: 0.6,
   },
   signInButtonText: {
     fontSize: 16,

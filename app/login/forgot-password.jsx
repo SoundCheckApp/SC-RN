@@ -2,26 +2,56 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Logo from "../../components/Logo";
+import { resetPassword } from "../../utils/auth";
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
-  const handleResetPassword = () => {
-    // TODO: Implement password reset logic
-    console.log("Reset password for:", email);
-    // Show success message and navigate back
-    router.back();
+  const handleResetPassword = async () => {
+    // Validate email
+    if (!email.trim()) {
+      setError("Please enter your email address");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+    setSuccess(false);
+
+    try {
+      const { error: resetError } = await resetPassword(email.trim());
+
+      if (resetError) {
+        setError(resetError.message || "Failed to send reset email. Please try again.");
+        setIsLoading(false);
+        return;
+      }
+
+      setSuccess(true);
+      // Auto-navigate back after 2 seconds
+      setTimeout(() => {
+        router.back();
+      }, 2000);
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+      console.error("Reset password error:", err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -64,7 +94,11 @@ export default function ForgotPasswordScreen() {
                     placeholder="your.email@example.com"
                     placeholderTextColor="#9CA3AF"
                     value={email}
-                    onChangeText={setEmail}
+                    onChangeText={(text) => {
+                      setEmail(text);
+                      setError("");
+                      setSuccess(false);
+                    }}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -72,13 +106,32 @@ export default function ForgotPasswordScreen() {
                 </View>
               </View>
 
+              {/* Error Message */}
+              {error ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              ) : null}
+
+              {/* Success Message */}
+              {success ? (
+                <View style={styles.successContainer}>
+                  <Text style={styles.successText}>
+                    Password reset email sent! Check your inbox.
+                  </Text>
+                </View>
+              ) : null}
+
               {/* Reset Button */}
               <TouchableOpacity
-                style={styles.resetButton}
+                style={[styles.resetButton, (isLoading || success) && styles.resetButtonDisabled]}
                 onPress={handleResetPassword}
                 activeOpacity={0.8}
+                disabled={isLoading || success}
               >
-                <Text style={styles.resetButtonText}>SEND RESET LINK</Text>
+                <Text style={styles.resetButtonText}>
+                  {isLoading ? "SENDING..." : success ? "EMAIL SENT" : "SEND RESET LINK"}
+                </Text>
               </TouchableOpacity>
 
               {/* Back to Login */}
@@ -163,6 +216,28 @@ const styles = StyleSheet.create({
     color: "#000000",
     paddingVertical: 0,
   },
+  errorContainer: {
+    backgroundColor: "#FEE2E2",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: "#DC2626",
+    fontSize: 14,
+    textAlign: "center",
+  },
+  successContainer: {
+    backgroundColor: "#D1FAE5",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  successText: {
+    color: "#065F46",
+    fontSize: 14,
+    textAlign: "center",
+  },
   resetButton: {
     backgroundColor: "#4F46E5",
     borderRadius: 12,
@@ -170,6 +245,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 24,
+  },
+  resetButtonDisabled: {
+    backgroundColor: "#6B7280",
+    opacity: 0.6,
   },
   resetButtonText: {
     fontSize: 16,
