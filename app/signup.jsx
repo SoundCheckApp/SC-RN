@@ -58,8 +58,8 @@ export default function SignUpScreen() {
       }
 
       if (user) {
-        // Navigate to login after successful signup
-        router.replace("/login");
+        // Navigate to account type selection for new users
+        router.replace("/selectAccountType");
       }
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");

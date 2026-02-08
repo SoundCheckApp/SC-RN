@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Logo from "../../components/Logo";
 import { signIn } from "../../utils/auth";
+import { checkUserProfile } from "../../utils/profile";
 import { clearCredentials, loadCredentials, saveCredentials } from "../../utils/storage";
 
 export default function LoginScreen() {
@@ -73,8 +74,23 @@ export default function LoginScreen() {
           await clearCredentials();
         }
 
-        // Navigate to main app after successful login
-        router.replace("/(tabs)");
+        // Check if user has a profile with account type
+        const { hasProfile, error: profileError } = await checkUserProfile();
+
+        if (profileError) {
+          console.error("Error checking profile:", profileError);
+          // Still navigate to main app if there's an error checking profile
+          router.replace("/(tabs)");
+          return;
+        }
+
+        if (!hasProfile) {
+          // User doesn't have a profile, navigate to account type selection
+          router.replace("/selectAccountType");
+        } else {
+          // User has a profile, navigate to main app
+          router.replace("/(tabs)");
+        }
       }
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
