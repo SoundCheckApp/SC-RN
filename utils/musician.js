@@ -141,3 +141,27 @@ export const getMusicianProfile = async () => {
     return { profile: null, error: { message: error.message } };
   }
 };
+
+/**
+ * Get musician profile by profile_id
+ * @param {string} profileId - The profile_id of the musician
+ * @returns {Promise<{profile: object|null, error: object|null}>}
+ */
+export const getMusicianProfileById = async (profileId) => {
+  try {
+    const { data: profile, error: profileError } = await supabase
+      .from("musicians")
+      .select("*")
+      .eq("profile_id", profileId)
+      .single();
+
+    if (profileError) {
+      return { profile: null, error: profileError };
+    }
+
+    return { profile, error: null };
+  } catch (error) {
+    console.error("Error getting musician profile by ID:", error);
+    return { profile: null, error: { message: error.message } };
+  }
+};

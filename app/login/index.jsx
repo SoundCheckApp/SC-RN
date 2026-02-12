@@ -92,8 +92,8 @@ export default function LoginScreen() {
           if (accountType === "musician") {
             router.replace("/musicianHomepage");
           } else {
-            // For consumers, navigate to main app
-            router.replace("/(tabs)");
+            // For consumers, navigate to consumer homepage
+            router.replace("/musicConsumerHomepage");
           }
         }
       }

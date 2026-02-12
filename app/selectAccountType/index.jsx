@@ -31,8 +31,8 @@ export default function SelectAccountTypeScreen() {
       if (accountType === "musician") {
         router.replace("/musicianCreateAccountPage");
       } else {
-        // For consumers, navigate to main app (or consumer profile page if needed)
-        router.replace("/(tabs)");
+        // For consumers, navigate to consumer profile creation page
+        router.replace("/musicConsumerCreateAccountPage");
       }
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
