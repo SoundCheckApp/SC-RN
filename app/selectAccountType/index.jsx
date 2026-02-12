@@ -27,8 +27,13 @@ export default function SelectAccountTypeScreen() {
         return;
       }
 
-      // Navigate to main app after successful save
-      router.replace("/(tabs)");
+      // Navigate based on account type
+      if (accountType === "musician") {
+        router.replace("/musicianCreateAccountPage");
+      } else {
+        // For consumers, navigate to main app (or consumer profile page if needed)
+        router.replace("/(tabs)");
+      }
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
       console.error("Save account type error:", err);

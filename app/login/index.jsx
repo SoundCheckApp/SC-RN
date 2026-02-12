@@ -75,7 +75,7 @@ export default function LoginScreen() {
         }
 
         // Check if user has a profile with account type
-        const { hasProfile, error: profileError } = await checkUserProfile();
+        const { hasProfile, accountType, error: profileError } = await checkUserProfile();
 
         if (profileError) {
           console.error("Error checking profile:", profileError);
@@ -88,8 +88,13 @@ export default function LoginScreen() {
           // User doesn't have a profile, navigate to account type selection
           router.replace("/selectAccountType");
         } else {
-          // User has a profile, navigate to main app
-          router.replace("/(tabs)");
+          // User has a profile, navigate based on account type
+          if (accountType === "musician") {
+            router.replace("/musicianHomepage");
+          } else {
+            // For consumers, navigate to main app
+            router.replace("/(tabs)");
+          }
         }
       }
     } catch (err) {
