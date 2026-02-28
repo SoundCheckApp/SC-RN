@@ -44,8 +44,8 @@ export const checkUserProfile = async () => {
 };
 
 /**
- * Save account type to user profile
- * Creates a record in either musicians or consumers table
+ * Save account type preference (temporary - just for routing)
+ * The actual profile records are created in the profile creation pages
  * @param {string} accountType - "musician" or "consumer"
  * @returns {Promise<{error: object|null}>}
  */
@@ -62,7 +62,7 @@ export const saveAccountType = async (accountType) => {
       return { error: { message: "Invalid account type" } };
     }
 
-    // First, ensure profile exists in profiles table
+    // Ensure profile exists in profiles table (just basic profile)
     const { data: existingProfile } = await supabase
       .from("profiles")
       .select("id")
@@ -70,14 +70,13 @@ export const saveAccountType = async (accountType) => {
       .single();
 
     if (!existingProfile) {
-      // Create profile if it doesn't exist
+      // Create basic profile if it doesn't exist
+      // Don't add account_type here - that will be determined by which table they're in
       const { error: profileError } = await supabase
         .from("profiles")
         .insert({
           id: user.id,
           full_name: user.user_metadata?.full_name || "",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         });
 
       if (profileError) {
@@ -85,50 +84,9 @@ export const saveAccountType = async (accountType) => {
       }
     }
 
-    // Check if user already has a record in either table
-    const { data: existingMusician } = await supabase
-      .from("musicians")
-      .select("profile_id")
-      .eq("profile_id", user.id)
-      .single();
-
-    const { data: existingConsumer } = await supabase
-      .from("consumers")
-      .select("profile_id")
-      .eq("profile_id", user.id)
-      .single();
-
-    // If user already has an account type, don't allow changing it
-    if (existingMusician || existingConsumer) {
-      return { error: { message: "Account type already set" } };
-    }
-
-    // Insert into the appropriate table based on account type
-    if (accountType === "musician") {
-      const { error: insertError } = await supabase
-        .from("musicians")
-        .insert({
-          profile_id: user.id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-
-      if (insertError) {
-        return { error: insertError };
-      }
-    } else if (accountType === "consumer") {
-      const { error: insertError } = await supabase
-        .from("consumers")
-        .insert({
-          profile_id: user.id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-
-      if (insertError) {
-        return { error: insertError };
-      }
-    }
+    // Don't create records in musicians/consumers tables yet
+    // Those will be created when they complete their profile on the profile creation pages
+    // This function just ensures the basic profile exists
 
     return { error: null };
   } catch (error) {

@@ -18,16 +18,18 @@ export default function SelectAccountTypeScreen() {
     setIsSaving(true);
 
     try {
-      // Save account type to user profile in Supabase
+      // Just ensure basic profile exists (no database insert to musicians/consumers yet)
+      // The actual profile records will be created when they complete their profile
       const { error: saveError } = await saveAccountType(accountType);
 
       if (saveError) {
-        setError(saveError.message || "Failed to save account type. Please try again.");
+        setError(saveError.message || "Failed to initialize profile. Please try again.");
         setIsSaving(false);
         return;
       }
 
       // Navigate based on account type
+      // The profile creation pages will create the actual records in musicians/consumers tables
       if (accountType === "musician") {
         router.replace("/musicianCreateAccountPage");
       } else {

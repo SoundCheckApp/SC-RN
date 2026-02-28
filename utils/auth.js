@@ -9,8 +9,10 @@ import { supabase } from "../lib/supabase";
  */
 export const signUp = async (email, password, fullName) => {
   try {
+    // Attempt to sign up
+    // Note: Supabase will handle duplicate email detection
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: email.trim().toLowerCase(), // Normalize email
       password,
       options: {
         data: {
@@ -19,13 +21,67 @@ export const signUp = async (email, password, fullName) => {
       },
     });
 
+    // Log the response for debugging
+    console.log("Signup response:", { data, error });
+
     if (error) {
-      return { user: null, error };
+      // Log full error for debugging
+      console.error("Supabase signup error:", {
+        message: error.message,
+        status: error.status,
+        code: error.code,
+        fullError: error,
+      });
+
+      // Check Supabase error codes and messages
+      const errorMessage = error.message?.toLowerCase() || "";
+      const errorStatus = error.status;
+      const errorCode = error.code;
+
+      // Only treat as "already registered" if we're certain
+      // Supabase returns specific error codes for this
+      const isAlreadyRegistered = 
+        errorMessage.includes("already registered") ||
+        errorMessage.includes("user already registered") ||
+        errorCode === "user_already_registered" ||
+        (errorStatus === 400 && errorMessage.includes("already"));
+
+      if (isAlreadyRegistered) {
+        // User already exists - suggest signing in
+        return { 
+          user: null, 
+          error: { message: "An account with this email already exists. Please sign in instead." } 
+        };
+      }
+
+      // For other errors, return the actual error message
+      // This might be validation errors, network errors, etc.
+      return { 
+        user: null, 
+        error: { 
+          message: error.message || "Failed to create account. Please try again.",
+          code: errorCode,
+          status: errorStatus,
+        } 
+      };
     }
 
-    return { user: data.user, error: null };
+    // Signup was successful
+    // Note: If email confirmation is required, data.user might be null
+    // but data.session will also be null. We should still proceed.
+    // The account was created in Supabase Auth, even if not confirmed yet.
+    
+    if (data.user || data.session) {
+      // User is created and/or session exists
+      return { user: data.user || { email }, error: null, needsConfirmation: !data.user };
+    }
+
+    // Even if both user and session are null (email confirmation required),
+    // the signup was successful - account was created
+    return { user: { email }, error: null, needsConfirmation: true };
   } catch (error) {
-    return { user: null, error: { message: error.message } };
+    console.error("Signup exception:", error);
+    return { user: null, error: { message: error.message || "An unexpected error occurred" } };
   }
 };
 

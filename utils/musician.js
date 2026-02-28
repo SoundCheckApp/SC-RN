@@ -27,8 +27,7 @@ export const saveMusicianProfile = async (profileData) => {
         .insert({
           id: user.id,
           full_name: `${profileData.firstName} ${profileData.lastName}`,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          // Note: created_at and updated_at will be auto-generated if your table has defaults
         });
 
       if (profileError) {
@@ -40,7 +39,7 @@ export const saveMusicianProfile = async (profileData) => {
         .from("profiles")
         .update({
           full_name: `${profileData.firstName} ${profileData.lastName}`,
-          updated_at: new Date().toISOString(),
+          // Note: updated_at will be auto-generated if your table has a trigger
         })
         .eq("id", user.id);
 
@@ -68,14 +67,19 @@ export const saveMusicianProfile = async (profileData) => {
       artist_name: profileData.artistName,
       genres: profileData.genres, // Array of genres
       bio: profileData.bio,
-      updated_at: new Date().toISOString(),
+      // Note: created_at and updated_at will be auto-generated if your table has defaults/triggers
     };
 
     if (existingMusician) {
       // Update existing musician record
+      // Add updated_at only if your table doesn't have an auto-update trigger
+      const updateData = {
+        ...musicianData,
+        // updated_at: new Date().toISOString(), // Uncomment if needed
+      };
       const { error: updateError } = await supabase
         .from("musicians")
-        .update(musicianData)
+        .update(updateData)
         .eq("profile_id", user.id);
 
       if (updateError) {
@@ -83,7 +87,8 @@ export const saveMusicianProfile = async (profileData) => {
       }
     } else {
       // Create new musician record
-      musicianData.created_at = new Date().toISOString();
+      // Note: Don't include created_at if your database auto-generates it
+      // If your table has a default value for created_at, remove this line
       const { error: insertError } = await supabase
         .from("musicians")
         .insert(musicianData);

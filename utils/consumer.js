@@ -27,8 +27,7 @@ export const saveConsumerProfile = async (profileData) => {
         .insert({
           id: user.id,
           full_name: `${profileData.firstName} ${profileData.lastName}`,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          // Note: created_at and updated_at will be auto-generated if your table has defaults
         });
 
       if (profileError) {
@@ -40,7 +39,7 @@ export const saveConsumerProfile = async (profileData) => {
         .from("profiles")
         .update({
           full_name: `${profileData.firstName} ${profileData.lastName}`,
-          updated_at: new Date().toISOString(),
+          // Note: updated_at will be auto-generated if your table has a trigger
         })
         .eq("id", user.id);
 
@@ -66,14 +65,19 @@ export const saveConsumerProfile = async (profileData) => {
       location: profileData.location,
       birthday: profileData.birthday,
       preferred_genre: profileData.preferredGenre,
-      updated_at: new Date().toISOString(),
+      // Note: created_at and updated_at will be auto-generated if your table has defaults/triggers
     };
 
     if (existingConsumer) {
       // Update existing consumer record
+      // Add updated_at only if your table doesn't have an auto-update trigger
+      const updateData = {
+        ...consumerData,
+        // updated_at: new Date().toISOString(), // Uncomment if needed
+      };
       const { error: updateError } = await supabase
         .from("consumers")
-        .update(consumerData)
+        .update(updateData)
         .eq("profile_id", user.id);
 
       if (updateError) {
@@ -81,7 +85,8 @@ export const saveConsumerProfile = async (profileData) => {
       }
     } else {
       // Create new consumer record
-      consumerData.created_at = new Date().toISOString();
+      // Note: Don't include created_at if your database auto-generates it
+      // If your table has a default value for created_at, remove this line
       const { error: insertError } = await supabase
         .from("consumers")
         .insert(consumerData);
