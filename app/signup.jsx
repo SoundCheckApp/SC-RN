@@ -133,7 +133,54 @@ export default function SignUpScreen() {
       const { user, error: authError, needsConfirmation } = await signUp(email.trim(), password, name.trim());
 
       if (authError) {
-        // Only show error if it's a real error (not just email confirmation)
+        // Check if the error is "user already exists"
+        const isUserExistsError = 
+          authError.message?.toLowerCase().includes("already exists") ||
+          authError.message?.toLowerCase().includes("already registered") ||
+          authError.code === "user_already_exists" ||
+          authError.status === 422;
+
+        if (isUserExistsError) {
+          // User exists in Supabase Auth - try to sign them in
+          // They might have started signup but didn't complete profile
+          console.log("User already exists in Auth, attempting sign-in...");
+          const { signIn } = await import("../utils/auth");
+          const { user: signedInUser, error: signInError } = await signIn(email.trim(), password);
+
+          if (signInError) {
+            // Sign-in failed - wrong password or other issue
+            setError("An account with this email already exists. Please sign in with your password or reset it if you forgot.");
+            setIsSigningUp(false);
+            return;
+          }
+
+          // Sign-in successful - check if they have a profile
+          if (signedInUser) {
+            const { checkUserProfile } = await import("../utils/profile");
+            const { hasProfile, accountType } = await checkUserProfile();
+
+            if (hasProfile) {
+              // User has a complete profile - navigate to their homepage
+              if (accountType === "musician") {
+                router.replace("/musicianHomepage");
+              } else if (accountType === "consumer") {
+                router.replace("/musicConsumerHomepage");
+              } else {
+                router.replace("/selectAccountType");
+              }
+              setIsSigningUp(false);
+              return;
+            } else {
+              // User signed in but no profile - navigate to account type selection
+              console.log("User signed in successfully but no profile found, navigating to account type selection...");
+              router.replace("/selectAccountType");
+              setIsSigningUp(false);
+              return;
+            }
+          }
+        }
+
+        // For other errors, show the error message
         console.log("Signup error details:", authError);
         setError(authError.message || "Failed to create account. Please try again.");
         setIsSigningUp(false);
