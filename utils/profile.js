@@ -77,10 +77,24 @@ export const saveAccountType = async (accountType) => {
         .insert({
           id: user.id,
           full_name: user.user_metadata?.full_name || "",
+          email: user.email || "",
         });
 
       if (profileError) {
+        console.error("Error creating profile:", profileError);
         return { error: profileError };
+      }
+    } else {
+      // Update profile with email if it's missing
+      if (!existingProfile.email && user.email) {
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update({ email: user.email })
+          .eq("id", user.id);
+        
+        if (updateError) {
+          console.error("Error updating profile email:", updateError);
+        }
       }
     }
 

@@ -21,7 +21,7 @@ export default function Index() {
           <Logo />
         </View>
         <Text style={styles.tagline}>Music Anytime... Anywhere</Text>
-      </View>
+    </View>
     </SafeAreaView>
   );
 }

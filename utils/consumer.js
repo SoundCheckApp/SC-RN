@@ -27,6 +27,7 @@ export const saveConsumerProfile = async (profileData) => {
         .insert({
           id: user.id,
           full_name: `${profileData.firstName} ${profileData.lastName}`,
+          email: user.email || "",
           // Note: created_at and updated_at will be auto-generated if your table has defaults
         });
 
@@ -34,11 +35,12 @@ export const saveConsumerProfile = async (profileData) => {
         return { error: profileError };
       }
     } else {
-      // Update profile with full name
+      // Update profile with full name and email
       const { error: updateError } = await supabase
         .from("profiles")
         .update({
           full_name: `${profileData.firstName} ${profileData.lastName}`,
+          email: user.email || existingProfile.email || "",
           // Note: updated_at will be auto-generated if your table has a trigger
         })
         .eq("id", user.id);

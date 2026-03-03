@@ -19,6 +19,7 @@ Your Supabase database should have the following structure:
 ### profiles table
 - `id` (UUID, Primary Key, References auth.users)
 - `full_name` (Text)
+- `email` (Text)
 - `created_at` (Timestamp)
 - `updated_at` (Timestamp)
 
