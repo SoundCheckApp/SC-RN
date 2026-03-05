@@ -72,17 +72,23 @@ export const saveAccountType = async (accountType) => {
     if (!existingProfile) {
       // Create basic profile if it doesn't exist
       // Don't add account_type here - that will be determined by which table they're in
+      // Email is the primary identifier for authentication
+      // Use upsert to handle race conditions where trigger might create profile simultaneously
       const { error: profileError } = await supabase
         .from("profiles")
-        .insert({
+        .upsert({
           id: user.id,
-          full_name: user.user_metadata?.full_name || "",
           email: user.email || "",
+        }, {
+          onConflict: 'id'
         });
 
       if (profileError) {
         console.error("Error creating profile:", profileError);
-        return { error: profileError };
+        // If it's a duplicate key error, the profile was likely created by trigger - that's okay
+        if (profileError.code !== '23505') { // 23505 is unique_violation
+          return { error: profileError };
+        }
       }
     } else {
       // Update profile with email if it's missing

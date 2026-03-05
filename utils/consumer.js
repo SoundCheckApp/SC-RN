@@ -21,12 +21,11 @@ export const saveConsumerProfile = async (profileData) => {
       .single();
 
     if (!existingProfile) {
-      // Create profile if it doesn't exist
+      // Create profile if it doesn't exist (email only - full_name is stored in consumers table)
       const { error: profileError } = await supabase
         .from("profiles")
         .insert({
           id: user.id,
-          full_name: `${profileData.firstName} ${profileData.lastName}`,
           email: user.email || "",
           // Note: created_at and updated_at will be auto-generated if your table has defaults
         });
@@ -35,11 +34,10 @@ export const saveConsumerProfile = async (profileData) => {
         return { error: profileError };
       }
     } else {
-      // Update profile with full name and email
+      // Update profile with email (full_name is stored in consumers table, not profiles)
       const { error: updateError } = await supabase
         .from("profiles")
         .update({
-          full_name: `${profileData.firstName} ${profileData.lastName}`,
           email: user.email || existingProfile.email || "",
           // Note: updated_at will be auto-generated if your table has a trigger
         })

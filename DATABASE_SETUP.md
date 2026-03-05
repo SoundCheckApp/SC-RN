@@ -18,10 +18,10 @@ Your Supabase database should have the following structure:
 
 ### profiles table
 - `id` (UUID, Primary Key, References auth.users)
-- `full_name` (Text)
-- `email` (Text)
+- `email` (Text) - Primary identifier for authentication
 - `created_at` (Timestamp)
 - `updated_at` (Timestamp)
+- Note: `full_name` is NOT stored here - it's stored in the `musicians` or `consumers` tables as `first_name` and `last_name`
 
 ### musicians table
 - `id` (UUID, Primary Key, Auto-generated)

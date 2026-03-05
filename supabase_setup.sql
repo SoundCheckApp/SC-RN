@@ -9,10 +9,11 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ============================================
 -- 1. Create profiles table
 -- ============================================
+-- Note: full_name is not stored here - it's stored in musicians/consumers tables
+-- Email is the primary identifier for authentication
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  full_name TEXT,
-  email TEXT,
+  email TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -81,15 +82,17 @@ CREATE TRIGGER update_consumers_updated_at
 -- ============================================
 -- 6. Create function to automatically create profile on signup
 -- ============================================
+-- This function runs with SECURITY DEFINER to bypass RLS
+-- It uses ON CONFLICT to handle cases where profile might already exist
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, full_name, email)
+  INSERT INTO public.profiles (id, email)
   VALUES (
     NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
     NEW.email
-  );
+  )
+  ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -124,9 +127,13 @@ CREATE POLICY "Users can view their own profile"
   USING (auth.uid() = id);
 
 -- Users can insert their own profile
+-- Allow insert if the id matches the authenticated user's id
 CREATE POLICY "Users can insert their own profile"
   ON profiles FOR INSERT
   WITH CHECK (auth.uid() = id);
+
+-- Allow service role to insert profiles (for trigger function)
+-- This is handled by SECURITY DEFINER in the trigger function, but we ensure the policy allows it
 
 -- Users can update their own profile
 CREATE POLICY "Users can update their own profile"

@@ -17,7 +17,6 @@ import { supabase } from "../lib/supabase";
 import { signUp } from "../utils/auth";
 
 export default function SignUpScreen() {
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -25,7 +24,6 @@ export default function SignUpScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSigningUp, setIsSigningUp] = useState(false);
   const [error, setError] = useState("");
-  const [nameFocused, setNameFocused] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [confirmPasswordFocused, setConfirmPasswordFocused] = useState(false);
@@ -64,7 +62,7 @@ export default function SignUpScreen() {
 
   const handleSignUp = async () => {
     // Validate inputs
-    if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
+    if (!email.trim() || !password.trim() || !confirmPassword.trim()) {
       setError("Please fill in all fields");
       return;
     }
@@ -130,7 +128,7 @@ export default function SignUpScreen() {
       }
 
       // Sign up with Supabase
-      const { user, error: authError, needsConfirmation } = await signUp(email.trim(), password, name.trim());
+      const { user, error: authError, needsConfirmation } = await signUp(email.trim(), password);
 
       if (authError) {
         // Check if the error is "user already exists"
@@ -234,31 +232,6 @@ export default function SignUpScreen() {
 
             {/* Form Section */}
             <View style={styles.formSection}>
-              {/* Name Field */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Full Name</Text>
-                <View style={[styles.inputWrapper, nameFocused && styles.inputWrapperFocused]}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="John Doe"
-                    placeholderTextColor="#9CA3AF"
-                    value={name}
-                    onChangeText={(text) => {
-                      setName(text);
-                      setError("");
-                    }}
-                    onFocus={() => setNameFocused(true)}
-                    onBlur={() => setNameFocused(false)}
-                    autoCapitalize="words"
-                    autoCorrect={false}
-                    returnKeyType="next"
-                    clearButtonMode="never"
-                    editable={true}
-                    selectTextOnFocus={false}
-                  />
-                </View>
-              </View>
-
               {/* Email Field */}
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Email</Text>

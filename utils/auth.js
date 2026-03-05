@@ -4,21 +4,16 @@ import { supabase } from "../lib/supabase";
  * Sign up a new user
  * @param {string} email - User email
  * @param {string} password - User password
- * @param {string} fullName - User's full name
  * @returns {Promise<{user: object|null, error: object|null}>}
  */
-export const signUp = async (email, password, fullName) => {
+export const signUp = async (email, password) => {
   try {
     // Attempt to sign up
     // Note: Supabase will handle duplicate email detection
+    // Email is used for authentication, no need for full_name in metadata
     const { data, error } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(), // Normalize email
       password,
-      options: {
-        data: {
-          full_name: fullName,
-        },
-      },
     });
 
     // Log the response for debugging
