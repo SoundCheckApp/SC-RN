@@ -211,7 +211,7 @@ export default function MusicianCreateAccountPage() {
             {/* Back Button */}
             <TouchableOpacity
               style={styles.backButton}
-              onPress={() => router.back()}
+              onPress={() => router.push("/selectAccountType")}
               activeOpacity={0.7}
             >
               <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
