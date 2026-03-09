@@ -44,14 +44,12 @@ export default function MusicianCreateAccountPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
   const [location, setLocation] = useState("");
   const [birthday, setBirthday] = useState("");
   const [artistName, setArtistName] = useState("");
   const [selectedGenres, setSelectedGenres] = useState([]);
   const [bio, setBio] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [showGenreModal, setShowGenreModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -119,14 +117,6 @@ export default function MusicianCreateAccountPage() {
       setError("Email is required");
       return false;
     }
-    if (!password.trim()) {
-      setError("Password is required");
-      return false;
-    }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
-      return false;
-    }
     if (!username.trim()) {
       setError("Username is required");
       return false;
@@ -171,7 +161,6 @@ export default function MusicianCreateAccountPage() {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim(),
-        password: password,
         username: username.trim(),
         location: location.trim(),
         birthday: birthday.trim(),
@@ -292,36 +281,6 @@ export default function MusicianCreateAccountPage() {
                     autoCapitalize="none"
                     autoCorrect={false}
                   />
-                </View>
-              </View>
-
-              {/* Password */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Password</Text>
-                <View style={styles.inputWrapper}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="........"
-                    placeholderTextColor="#6B7280"
-                    value={password}
-                    onChangeText={(text) => {
-                      setPassword(text);
-                      setError("");
-                    }}
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  <TouchableOpacity
-                    style={styles.inputIcon}
-                    onPress={() => setShowPassword(!showPassword)}
-                  >
-                    <Ionicons
-                      name={showPassword ? "eye-off" : "eye"}
-                      size={20}
-                      color="#F97316"
-                    />
-                  </TouchableOpacity>
                 </View>
               </View>
 
