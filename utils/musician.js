@@ -49,15 +49,21 @@ export const saveMusicianProfile = async (profileData) => {
     }
 
     // Check if musician record exists
+    // musicians.id should match profiles.id (same UUID)
     const { data: existingMusician } = await supabase
       .from("musicians")
-      .select("profile_id")
-      .eq("profile_id", user.id)
+      .select("id")
+      .eq("id", user.id)
       .single();
 
     // Prepare musician data
+    // Convert genres array to comma-separated string for storage
+    const genresString = Array.isArray(profileData.genres) 
+      ? profileData.genres.join(", ") 
+      : profileData.genres || "";
+    
     const musicianData = {
-      profile_id: user.id,
+      id: user.id, // Use the same ID as profiles.id
       first_name: profileData.firstName,
       last_name: profileData.lastName,
       email: profileData.email,
@@ -65,7 +71,7 @@ export const saveMusicianProfile = async (profileData) => {
       location: profileData.location,
       birthday: profileData.birthday,
       artist_name: profileData.artistName,
-      genres: profileData.genres, // Array of genres
+      genres: genresString, // Store as comma-separated string
       bio: profileData.bio,
       // Note: created_at and updated_at will be auto-generated if your table has defaults/triggers
     };
@@ -80,7 +86,7 @@ export const saveMusicianProfile = async (profileData) => {
       const { error: updateError } = await supabase
         .from("musicians")
         .update(updateData)
-        .eq("profile_id", user.id);
+        .eq("id", user.id);
 
       if (updateError) {
         return { error: updateError };
@@ -133,7 +139,7 @@ export const getMusicianProfile = async () => {
     const { data: profile, error: profileError } = await supabase
       .from("musicians")
       .select("*")
-      .eq("profile_id", user.id)
+      .eq("id", user.id)
       .single();
 
     if (profileError) {
@@ -148,8 +154,8 @@ export const getMusicianProfile = async () => {
 };
 
 /**
- * Get musician profile by profile_id
- * @param {string} profileId - The profile_id of the musician
+ * Get musician profile by id
+ * @param {string} profileId - The id of the musician (same as profiles.id)
  * @returns {Promise<{profile: object|null, error: object|null}>}
  */
 export const getMusicianProfileById = async (profileId) => {
@@ -157,7 +163,7 @@ export const getMusicianProfileById = async (profileId) => {
     const { data: profile, error: profileError } = await supabase
       .from("musicians")
       .select("*")
-      .eq("profile_id", profileId)
+      .eq("id", profileId)
       .single();
 
     if (profileError) {

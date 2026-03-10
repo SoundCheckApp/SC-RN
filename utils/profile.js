@@ -14,10 +14,11 @@ export const checkUserProfile = async () => {
     }
 
     // Check if user exists in musicians table
+    // musicians.id should match profiles.id (same UUID)
     const { data: musician, error: musicianError } = await supabase
       .from("musicians")
-      .select("profile_id")
-      .eq("profile_id", user.id)
+      .select("id")
+      .eq("id", user.id)
       .single();
 
     if (musician && !musicianError) {
@@ -25,10 +26,11 @@ export const checkUserProfile = async () => {
     }
 
     // Check if user exists in consumers table
+    // consumers.id should match profiles.id (same UUID)
     const { data: consumer, error: consumerError } = await supabase
       .from("consumers")
-      .select("profile_id")
-      .eq("profile_id", user.id)
+      .select("id")
+      .eq("id", user.id)
       .single();
 
     if (consumer && !consumerError) {

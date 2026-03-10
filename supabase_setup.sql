@@ -21,15 +21,18 @@ CREATE TABLE IF NOT EXISTS profiles (
 -- ============================================
 -- 2. Create musicians table
 -- ============================================
+-- Note: musicians.id should match profiles.id (same UUID, one-to-one relationship)
 CREATE TABLE IF NOT EXISTS musicians (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  profile_id UUID UNIQUE NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  artist_name TEXT,
-  genre TEXT,
-  bio TEXT,
+  id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+  first_name TEXT,
+  last_name TEXT,
+  email TEXT,
+  username TEXT,
   location TEXT,
   birthday DATE,
-  username TEXT,
+  artist_name TEXT,
+  genres TEXT, -- Store genres as comma-separated string or JSON
+  bio TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -37,11 +40,12 @@ CREATE TABLE IF NOT EXISTS musicians (
 -- ============================================
 -- 3. Create consumers table
 -- ============================================
+-- Note: consumers.id should match profiles.id (same UUID, one-to-one relationship)
 CREATE TABLE IF NOT EXISTS consumers (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  profile_id UUID UNIQUE NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
   first_name TEXT,
   last_name TEXT,
+  email TEXT,
   preferred_genre TEXT,
   location TEXT,
   birthday DATE,
@@ -152,18 +156,18 @@ DROP POLICY IF EXISTS "Users can update their own musician record" ON musicians;
 -- Users can view their own musician record
 CREATE POLICY "Users can view their own musician record"
   ON musicians FOR SELECT
-  USING (auth.uid() = profile_id);
+  USING (auth.uid() = id);
 
 -- Users can insert their own musician record
 CREATE POLICY "Users can insert their own musician record"
   ON musicians FOR INSERT
-  WITH CHECK (auth.uid() = profile_id);
+  WITH CHECK (auth.uid() = id);
 
 -- Users can update their own musician record
 CREATE POLICY "Users can update their own musician record"
   ON musicians FOR UPDATE
-  USING (auth.uid() = profile_id)
-  WITH CHECK (auth.uid() = profile_id);
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
 
 -- ============================================
 -- 11. Create RLS Policies for consumers table
@@ -176,24 +180,24 @@ DROP POLICY IF EXISTS "Users can update their own consumer record" ON consumers;
 -- Users can view their own consumer record
 CREATE POLICY "Users can view their own consumer record"
   ON consumers FOR SELECT
-  USING (auth.uid() = profile_id);
+  USING (auth.uid() = id);
 
 -- Users can insert their own consumer record
 CREATE POLICY "Users can insert their own consumer record"
   ON consumers FOR INSERT
-  WITH CHECK (auth.uid() = profile_id);
+  WITH CHECK (auth.uid() = id);
 
 -- Users can update their own consumer record
 CREATE POLICY "Users can update their own consumer record"
   ON consumers FOR UPDATE
-  USING (auth.uid() = profile_id)
-  WITH CHECK (auth.uid() = profile_id);
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
 
 -- ============================================
 -- 12. Create indexes for better performance
 -- ============================================
-CREATE INDEX IF NOT EXISTS idx_musicians_profile_id ON musicians(profile_id);
-CREATE INDEX IF NOT EXISTS idx_consumers_profile_id ON consumers(profile_id);
+-- Note: id is already the primary key, so indexes are automatically created
+-- Additional indexes can be added here if needed for specific queries
 CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email);
 
 -- ============================================

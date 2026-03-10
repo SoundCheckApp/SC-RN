@@ -49,15 +49,16 @@ export const saveConsumerProfile = async (profileData) => {
     }
 
     // Check if consumer record exists
+    // consumers.id should match profiles.id (same UUID)
     const { data: existingConsumer } = await supabase
       .from("consumers")
-      .select("profile_id")
-      .eq("profile_id", user.id)
+      .select("id")
+      .eq("id", user.id)
       .single();
 
     // Prepare consumer data
     const consumerData = {
-      profile_id: user.id,
+      id: user.id, // Use the same ID as profiles.id
       first_name: profileData.firstName,
       last_name: profileData.lastName,
       email: profileData.email,
@@ -78,7 +79,7 @@ export const saveConsumerProfile = async (profileData) => {
       const { error: updateError } = await supabase
         .from("consumers")
         .update(updateData)
-        .eq("profile_id", user.id);
+        .eq("id", user.id);
 
       if (updateError) {
         return { error: updateError };
