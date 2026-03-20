@@ -13,8 +13,10 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 2. Start the app
 
    ```bash
-   npx expo start
+   npm start
    ```
+
+   Default dev server uses **localhost** (not LAN). That avoids iOS Simulator timeouts when opening `exp://…` via `simctl openurl`. For a **physical phone** on the same Wi‑Fi, use `npm run start:lan` and scan the QR code.
 
 In the output, you'll find options to open the app in a
 
@@ -24,6 +26,10 @@ In the output, you'll find options to open the app in a
 - [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+
+### Supabase
+
+Apply `supabase_setup.sql` in the Supabase SQL editor. **Insights → Ratings** reads from the **`consumer_reviews`** table (`rating` 1–5, `musician_id`, `consumer_id`). Ensure RLS allows the musician to `SELECT` rows where `musician_id = auth.uid()`.
 
 ## Get a fresh project
 

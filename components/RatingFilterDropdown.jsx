@@ -1,23 +1,37 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
-    FlatList,
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
-const INSIGHT_TYPES = ["Tips", "Ratings", "Review", "Followers"];
+export const RATING_FILTER_OPTIONS = [
+  "All Ratings",
+  "5 Stars",
+  "4 Stars",
+  "3 Stars",
+  "2 Stars",
+  "1 Star",
+];
 
-export default function InsightTypeDropdown({ selected, onSelect }) {
+/** @returns {number|null} star count or null for all */
+export function ratingFilterToStars(label) {
+  if (label === "All Ratings") return null;
+  const m = /^(\d) Stars$/.exec(label);
+  return m ? Number(m[1]) : null;
+}
+
+export default function RatingFilterDropdown({ selected, onSelect }) {
   const [showModal, setShowModal] = useState(false);
 
   return (
     <>
       <View style={styles.container}>
-        <Text style={styles.label}>Insight Type</Text>
+        <Text style={styles.label}>Filter by Rating</Text>
         <TouchableOpacity
           style={styles.dropdownButton}
           onPress={() => setShowModal(true)}
@@ -30,14 +44,14 @@ export default function InsightTypeDropdown({ selected, onSelect }) {
 
       <Modal
         visible={showModal}
-        transparent={true}
+        transparent
         animationType="slide"
         onRequestClose={() => setShowModal(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Insight Type</Text>
+              <Text style={styles.modalTitle}>Filter by Rating</Text>
               <TouchableOpacity
                 onPress={() => setShowModal(false)}
                 style={styles.modalCloseButton}
@@ -46,32 +60,34 @@ export default function InsightTypeDropdown({ selected, onSelect }) {
               </TouchableOpacity>
             </View>
             <FlatList
-              data={INSIGHT_TYPES}
+              data={RATING_FILTER_OPTIONS}
               keyExtractor={(item) => item}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.modalItem,
-                    selected === item && styles.modalItemSelected,
-                  ]}
-                  onPress={() => {
-                    onSelect(item);
-                    setShowModal(false);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.modalItemText,
-                      selected === item && styles.modalItemTextSelected,
-                    ]}
+              renderItem={({ item }) => {
+                const isSelected = selected === item;
+                return (
+                  <TouchableOpacity
+                    style={[styles.modalItem, isSelected && styles.modalItemSelected]}
+                    onPress={() => {
+                      onSelect(item);
+                      setShowModal(false);
+                    }}
                   >
-                    {item}
-                  </Text>
-                  {selected === item && (
-                    <Ionicons name="checkmark" size={20} color="#10B981" />
-                  )}
-                </TouchableOpacity>
-              )}
+                    <View style={styles.checkSlot}>
+                      {isSelected && (
+                        <Ionicons name="checkmark" size={20} color="#10B981" />
+                      )}
+                    </View>
+                    <Text
+                      style={[
+                        styles.modalItemText,
+                        isSelected && styles.modalItemTextSelected,
+                      ]}
+                    >
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }}
             />
           </View>
         </View>
@@ -97,7 +113,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#1F2937",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#FFFFFF",
+    borderColor: "#374151",
     paddingHorizontal: 16,
     paddingVertical: 14,
     minHeight: 52,
@@ -136,21 +152,26 @@ const styles = StyleSheet.create({
   },
   modalItem: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#374151",
   },
   modalItemSelected: {
     backgroundColor: "#374151",
   },
+  checkSlot: {
+    width: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   modalItemText: {
     fontSize: 16,
     color: "#FFFFFF",
+    flex: 1,
   },
   modalItemTextSelected: {
-    color: "#FFFFFF",
     fontWeight: "600",
   },
 });
