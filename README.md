@@ -2,6 +2,8 @@
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
+**Local path:** the repo is intended to live at **`~/Developer/sc-app`** (outside Desktop/iCloud-heavy paths so Git and Metro stay responsive). In Cursor/VS Code use **File → Open Folder** and choose that directory if your window still points at an old location.
+
 ## Get started
 
 1. Install dependencies
@@ -29,7 +31,7 @@ You can start developing by editing the files inside the **app** directory. This
 
 ### Supabase
 
-Apply `supabase_setup.sql` in the Supabase SQL editor. **Insights → Ratings** and **Insights → Reviews** read from **`consumer_reviews`** (`rating`, optional `review_text`, `musician_id`, `consumer_id`, `created_at`). Ensure RLS allows the musician to `SELECT` rows where `musician_id = auth.uid()`.
+Apply `supabase_setup.sql` in the Supabase SQL editor. **Insights → Ratings** and **Insights → Reviews** use **`consumer_reviews`**; **Insights → Followers** uses **`consumer_follows`**. Musicians need `SELECT` where `musician_id = auth.uid()` on those tables (and appropriate policies on joined `consumers` rows).
 
 ## Get a fresh project
 
