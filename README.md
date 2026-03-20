@@ -29,7 +29,7 @@ You can start developing by editing the files inside the **app** directory. This
 
 ### Supabase
 
-Apply `supabase_setup.sql` in the Supabase SQL editor. **Insights → Ratings** reads from the **`consumer_reviews`** table (`rating` 1–5, `musician_id`, `consumer_id`). Ensure RLS allows the musician to `SELECT` rows where `musician_id = auth.uid()`.
+Apply `supabase_setup.sql` in the Supabase SQL editor. **Insights → Ratings** and **Insights → Reviews** read from **`consumer_reviews`** (`rating`, optional `review_text`, `musician_id`, `consumer_id`, `created_at`). Ensure RLS allows the musician to `SELECT` rows where `musician_id = auth.uid()`.
 
 ## Get a fresh project
 
