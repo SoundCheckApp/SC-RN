@@ -33,6 +33,8 @@ You can start developing by editing the files inside the **app** directory. This
 
 Apply `supabase_setup.sql` in the Supabase SQL editor. **Insights → Ratings** and **Insights → Reviews** use **`consumer_reviews`**; **Insights → Followers** uses **`consumer_follows`**. Musicians need `SELECT` where `musician_id = auth.uid()` on those tables (and appropriate policies on joined `consumers` rows).
 
+**Musician → Events** reads **`consumer_checkins`** (and embedded **`consumer_tips`** for amounts). Ensure RLS allows the musician to `SELECT` check-ins where `musician_id = auth.uid()` (and to read related `consumer_tips` for those rows).
+
 ## Get a fresh project
 
 When you're ready, run:
