@@ -176,3 +176,187 @@ export const getMusicianProfileById = async (profileId) => {
     return { profile: null, error: { message: error.message } };
   }
 };
+
+/** Public Supabase Storage bucket for profile images (create in dashboard + RLS). */
+const AVATAR_BUCKET = "avatars";
+
+/**
+ * Musician row + profile email/avatar for Account settings.
+ * @returns {Promise<{ data: object|null, error: object|null }>}
+ */
+export const getMusicianAccountForSettings = async () => {
+  try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { data: null, error: { message: "User not authenticated" } };
+    }
+
+    const [musicianRes, profileRes] = await Promise.all([
+      supabase.from("musicians").select("*").eq("id", user.id).single(),
+      supabase.from("profiles").select("email, avatar_url").eq("id", user.id).single(),
+    ]);
+
+    if (musicianRes.error) {
+      return { data: null, error: musicianRes.error };
+    }
+
+    const m = musicianRes.data;
+    const p = profileRes.data;
+
+    return {
+      data: {
+        ...m,
+        email: p?.email ?? user.email ?? m.email ?? "",
+        avatar_url: p?.avatar_url ?? null,
+      },
+      error: null,
+    };
+  } catch (error) {
+    console.error("getMusicianAccountForSettings:", error);
+    return { data: null, error: { message: error.message } };
+  }
+};
+
+/**
+ * Updates only fields the user is allowed to edit (not name, genre, birthday, age).
+ */
+export const updateMusicianEditableAccount = async ({
+  email,
+  username,
+  artistName,
+  location,
+  bio,
+}) => {
+  try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { error: { message: "User not authenticated" } };
+    }
+
+    const nextEmail = (email ?? "").trim();
+    const authEmail = user.email?.toLowerCase() ?? "";
+    if (nextEmail && nextEmail.toLowerCase() !== authEmail) {
+      const { error: authEmailErr } = await supabase.auth.updateUser({
+        email: nextEmail,
+      });
+      if (authEmailErr) {
+        return { error: authEmailErr };
+      }
+    }
+
+    const payload = {
+      email: nextEmail,
+      username: (username ?? "").trim(),
+      artist_name: (artistName ?? "").trim(),
+      location: (location ?? "").trim(),
+      bio: (bio ?? "").trim(),
+    };
+
+    const { error: mErr } = await supabase
+      .from("musicians")
+      .update(payload)
+      .eq("id", user.id);
+
+    if (mErr) {
+      return { error: mErr };
+    }
+
+    const { error: pErr } = await supabase
+      .from("profiles")
+      .update({ email: nextEmail })
+      .eq("id", user.id);
+
+    if (pErr) {
+      return { error: pErr };
+    }
+
+    return { error: null };
+  } catch (error) {
+    console.error("updateMusicianEditableAccount:", error);
+    return { error: { message: error.message } };
+  }
+};
+
+/**
+ * Uploads a local image to Storage and saves `profiles.avatar_url`.
+ * Requires a public `avatars` bucket (or adjust bucket name / policies in Supabase).
+ */
+export const uploadMusicianAvatar = async (localUri) => {
+  try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { avatarUrl: null, error: { message: "User not authenticated" } };
+    }
+
+    const raw = localUri.split(".").pop()?.split("?")[0]?.toLowerCase() ?? "jpg";
+    const ext = ["jpg", "jpeg", "png", "webp", "heic"].includes(raw) ? raw : "jpg";
+    const objectPath = `${user.id}/avatar.${ext}`;
+
+    const response = await fetch(localUri);
+    const blob = await response.blob();
+    const contentType = blob.type || (ext === "jpg" ? "image/jpeg" : `image/${ext}`);
+
+    const { error: upErr } = await supabase.storage
+      .from(AVATAR_BUCKET)
+      .upload(objectPath, blob, { upsert: true, contentType });
+
+    if (upErr) {
+      return { avatarUrl: null, error: upErr };
+    }
+
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(objectPath);
+
+    const { error: dbErr } = await supabase
+      .from("profiles")
+      .update({ avatar_url: publicUrl })
+      .eq("id", user.id);
+
+    if (dbErr) {
+      return { avatarUrl: null, error: dbErr };
+    }
+
+    return { avatarUrl: publicUrl, error: null };
+  } catch (error) {
+    console.error("uploadMusicianAvatar:", error);
+    return { avatarUrl: null, error: { message: error.message } };
+  }
+};
+
+/** Display age from a calendar birthday (prefer over stored `age` when birthday exists). */
+export const ageFromBirthday = (birthday) => {
+  if (!birthday) return null;
+  const d = new Date(birthday);
+  if (Number.isNaN(d.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - d.getFullYear();
+  const m = today.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < d.getDate())) {
+    age -= 1;
+  }
+  return age;
+};
+
+export const formatBirthdayDisplay = (birthday) => {
+  if (!birthday) return "";
+  const d = new Date(birthday);
+  if (Number.isNaN(d.getTime())) return String(birthday);
+  return d.toLocaleDateString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  });
+};

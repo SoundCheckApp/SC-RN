@@ -29,11 +29,17 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+### Architecture
+
+In-repo technical overview (stack, data flows, Supabase touchpoints, Mermaid diagrams): **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+
 ### Supabase
 
 Apply `supabase_setup.sql` in the Supabase SQL editor. **Insights → Ratings** and **Insights → Reviews** use **`consumer_reviews`**; **Insights → Followers** uses **`consumer_follows`**. Musicians need `SELECT` where `musician_id = auth.uid()` on those tables (and appropriate policies on joined `consumers` rows).
 
 **Musician → Events** reads **`consumer_checkins`** (and embedded **`consumer_tips`** for amounts). Ensure RLS allows the musician to `SELECT` check-ins where `musician_id = auth.uid()` (and to read related `consumer_tips` for those rows).
+
+**Musician → Account / Settings** loads **`musicians`** plus **`profiles`** (`email`, `avatar_url`). Profile photos upload to a Storage bucket named **`avatars`** (create it in Supabase, set policies so authenticated users can upload to `avatars/{user_id}/…`, and use a public URL or signed URLs for `profiles.avatar_url`).
 
 ## Get a fresh project
 
