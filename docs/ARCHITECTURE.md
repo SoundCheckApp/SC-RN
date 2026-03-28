@@ -83,6 +83,11 @@ sequenceDiagram
 - **Public profile preview:** `app/musicianProfile/[id].jsx` — loaded via `utils/musician.js` (`getMusicianProfileById`).
 - **Root stack:** `app/_layout.jsx` (stack, headers hidden by screen options).
 
+### Consumer (music consumer homepage)
+
+- **Tabs:** `app/musicConsumerHomepage/_layout.jsx` — Homepage, Insights, Events, Settings.
+- **Insights:** `app/musicConsumerHomepage/insights.jsx` — view switcher **Tips Given** / **Reviews Given** / **Following**; tips use **Weekly / Monthly / Yearly** via `ConsumerTipsTimeFrameDropdown`. Logic and queries: `utils/consumerInsights.js`. UI pieces are prefixed **`Consumer*`** in `components/` (e.g. `ConsumerInsightsViewDropdown`, `ConsumerTipsGivenInsights`).
+
 ---
 
 ## 7. Feature: Musician → Events
@@ -176,7 +181,7 @@ flowchart LR
 | Profiles | `profiles` | Email, `avatar_url`; linked 1:1 with user id |
 | Musicians | `musicians` | Musician profile fields, events `musician_id`, check-ins `musician_id` |
 | Consumers | `consumers` | Consumer flows |
-| Insights / social | `consumer_reviews`, `consumer_follows`, etc. | Insights tabs |
+| Insights / social | `consumer_reviews`, `consumer_follows`, `consumer_tips` | Musician Insights; **consumer** Insights (`Consumer*` components) |
 | Events | `consumer_checkins`, `consumer_tips` | Musician Events screen |
 | Storage | Bucket `avatars` | Profile photo uploads |
 
