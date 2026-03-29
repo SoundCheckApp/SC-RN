@@ -1,5 +1,182 @@
 import { supabase } from "../lib/supabase";
 
+/** Same list as consumer signup — used for Preferred Genre picker in Account settings. */
+export const CONSUMER_GENRE_OPTIONS = [
+  "Pop",
+  "Rock",
+  "Hip Hop",
+  "R&B",
+  "Country",
+  "Jazz",
+  "Electronic",
+  "Classical",
+  "Folk",
+  "Reggae",
+  "Blues",
+  "Metal",
+  "Punk",
+  "Indie",
+  "Alternative",
+  "Latin",
+  "Gospel",
+  "Soul",
+  "Funk",
+  "Disco",
+  "World",
+];
+
+const BIO_MAX_LEN = 500;
+
+/**
+ * Consumer row + profile email/avatar for Account settings.
+ * @returns {Promise<{ data: object|null, error: object|null }>}
+ */
+export const getConsumerAccountForSettings = async () => {
+  try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { data: null, error: { message: "User not authenticated" } };
+    }
+
+    const [consumerRes, profileRes] = await Promise.all([
+      supabase.from("consumers").select("*").eq("id", user.id).maybeSingle(),
+      supabase.from("profiles").select("email, avatar_url").eq("id", user.id).maybeSingle(),
+    ]);
+
+    if (consumerRes.error) {
+      return { data: null, error: consumerRes.error };
+    }
+
+    const c = consumerRes.data;
+    const p = profileRes.data;
+
+    return {
+      data: {
+        first_name: c?.first_name ?? "",
+        last_name: c?.last_name ?? "",
+        username: c?.username ?? "",
+        location: c?.location ?? "",
+        preferred_genre: c?.preferred_genre ?? "",
+        bio: (c?.bio ?? "").slice(0, BIO_MAX_LEN),
+        email: user.email ?? p?.email ?? "",
+        avatar_url: p?.avatar_url ?? null,
+      },
+      error: null,
+    };
+  } catch (error) {
+    console.error("getConsumerAccountForSettings:", error);
+    return { data: null, error: { message: error.message } };
+  }
+};
+
+/**
+ * Updates editable consumer fields. Email is not written (read-only in UI; use Auth flows to change).
+ */
+export const updateConsumerEditableAccount = async ({
+  firstName,
+  lastName,
+  username,
+  location,
+  preferredGenre,
+  bio,
+}) => {
+  try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { error: { message: "User not authenticated" } };
+    }
+
+    const payload = {
+      first_name: (firstName ?? "").trim(),
+      last_name: (lastName ?? "").trim(),
+      username: (username ?? "").trim(),
+      location: (location ?? "").trim(),
+      preferred_genre: (preferredGenre ?? "").trim(),
+      bio: (bio ?? "").trim().slice(0, BIO_MAX_LEN),
+    };
+
+    const { error } = await supabase
+      .from("consumers")
+      .update(payload)
+      .eq("id", user.id);
+
+    if (error) {
+      return { error };
+    }
+
+    return { error: null };
+  } catch (error) {
+    console.error("updateConsumerEditableAccount:", error);
+    return { error: { message: error.message } };
+  }
+};
+
+/**
+ * Public-style consumer profile by id (preview / future deep links).
+ */
+export const getConsumerProfileById = async (profileId) => {
+  try {
+    if (!profileId) {
+      return { profile: null, error: null };
+    }
+
+    const [consumerRes, profileRes] = await Promise.all([
+      supabase
+        .from("consumers")
+        .select(
+          "id, first_name, last_name, username, location, preferred_genre, bio"
+        )
+        .eq("id", profileId)
+        .maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("avatar_url")
+        .eq("id", profileId)
+        .maybeSingle(),
+    ]);
+
+    if (consumerRes.error) {
+      return { profile: null, error: consumerRes.error };
+    }
+
+    const c = consumerRes.data;
+    if (!c) {
+      return { profile: null, error: { message: "Profile not found" } };
+    }
+
+    const name =
+      `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() ||
+      c.username ||
+      "Consumer";
+
+    return {
+      profile: {
+        id: c.id,
+        displayName: name,
+        username: c.username ?? "",
+        location: c.location ?? "",
+        preferredGenre: c.preferred_genre ?? "",
+        bio: c.bio ?? "",
+        avatar_url: profileRes.data?.avatar_url ?? null,
+      },
+      error: null,
+    };
+  } catch (error) {
+    console.error("getConsumerProfileById:", error);
+    return { profile: null, error: { message: error.message } };
+  }
+};
+
+export const CONSUMER_BIO_MAX_LENGTH = BIO_MAX_LEN;
+
 /**
  * Save consumer profile data
  * @param {object} profileData - Consumer profile data
@@ -66,6 +243,7 @@ export const saveConsumerProfile = async (profileData) => {
       location: profileData.location,
       birthday: profileData.birthday,
       preferred_genre: profileData.preferredGenre,
+      bio: profileData.bio != null ? String(profileData.bio).slice(0, BIO_MAX_LEN) : "",
       // Note: created_at and updated_at will be auto-generated if your table has defaults/triggers
     };
 
