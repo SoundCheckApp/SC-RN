@@ -1,11 +1,16 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { fetchConsumerReviewsGiven } from "../utils/consumerInsights";
+import {
+  fetchConsumerReviewsGiven,
+  parseReviewsFilterStars,
+} from "../utils/consumerInsights";
+import ConsumerReviewsFilterDropdown from "./ConsumerReviewsFilterDropdown";
+import ConsumerReviewsSummaryCard from "./ConsumerReviewsSummaryCard";
 
 function formatShortDate(iso) {
   if (!iso) return "";
@@ -20,8 +25,9 @@ function formatShortDate(iso) {
   }
 }
 
-/** Consumer-only: reviews the user left on musicians. */
+/** Consumer-only: reviews the user left on musicians (filter + summary + list). */
 export default function ConsumerReviewsGivenSection({ consumerId }) {
+  const [filter, setFilter] = useState("All Reviews");
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState([]);
 
@@ -47,53 +53,64 @@ export default function ConsumerReviewsGivenSection({ consumerId }) {
     load();
   }, [load]);
 
+  const starsFilter = parseReviewsFilterStars(filter);
+  const filtered = useMemo(() => {
+    if (starsFilter == null) return reviews;
+    return reviews.filter((r) => Number(r.rating) === starsFilter);
+  }, [reviews, starsFilter]);
+
+  const displayList = filtered;
+
   return (
-    <View style={styles.card}>
-      <Text style={styles.title}>Reviews Given</Text>
-      <Text style={styles.count}>
-        {loading ? "…" : `${reviews.length} total`}
-      </Text>
-      {loading ? (
-        <ActivityIndicator color="#FFFFFF" style={styles.loader} />
-      ) : reviews.length === 0 ? (
-        <Text style={styles.empty}>No reviews yet.</Text>
-      ) : (
-        reviews.slice(0, 20).map((r) => (
-          <View key={r.id} style={styles.row}>
-            <Text style={styles.stars}>{"★".repeat(r.rating || 0)}</Text>
-            <View style={styles.rowText}>
-              <Text style={styles.preview} numberOfLines={2}>
-                {r.review_text?.trim() || "(No text)"}
-              </Text>
-              <Text style={styles.date}>{formatShortDate(r.created_at)}</Text>
+    <>
+      <View style={styles.filterCard}>
+        <ConsumerReviewsFilterDropdown selected={filter} onSelect={setFilter} />
+      </View>
+
+      <ConsumerReviewsSummaryCard total={filtered.length} loading={loading} />
+
+      <View style={styles.listCard}>
+        {loading ? (
+          <ActivityIndicator color="#FFFFFF" style={styles.loader} />
+        ) : displayList.length === 0 ? (
+          <Text style={styles.empty}>No reviews found</Text>
+        ) : (
+          displayList.map((r, i) => (
+            <View
+              key={r.id}
+              style={[styles.row, i > 0 && styles.rowDivider]}
+            >
+              <Text style={styles.starLine}>{"★".repeat(r.rating || 0)}</Text>
+              <View style={styles.rowText}>
+                <Text style={styles.preview} numberOfLines={2}>
+                  {r.review_text?.trim() || "(No text)"}
+                </Text>
+                <Text style={styles.date}>{formatShortDate(r.created_at)}</Text>
+              </View>
             </View>
-          </View>
-        ))
-      )}
-    </View>
+          ))
+        )}
+      </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
+  filterCard: {
     backgroundColor: "#1C1C1E",
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
   },
-  title: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    marginBottom: 8,
-  },
-  count: {
-    fontSize: 14,
-    color: "#9CA3AF",
+  listCard: {
+    backgroundColor: "#1C1C1E",
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 16,
+    minHeight: 120,
   },
   loader: {
-    marginVertical: 24,
+    marginVertical: 32,
   },
   empty: {
     fontSize: 15,
@@ -103,12 +120,14 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: "row",
-    borderTopWidth: 1,
-    borderTopColor: "#374151",
     paddingTop: 12,
     paddingBottom: 8,
   },
-  stars: {
+  rowDivider: {
+    borderTopWidth: 1,
+    borderTopColor: "#374151",
+  },
+  starLine: {
     fontSize: 12,
     color: "#FBBF24",
     width: 72,

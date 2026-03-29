@@ -8,10 +8,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { CONSUMER_INSIGHT_VIEWS } from "../utils/consumerInsights";
+import { CONSUMER_REVIEWS_FILTER_OPTIONS } from "../utils/consumerInsights";
 
-/** Consumer-only: main insight type (Tips / Reviews / Following). */
-export default function ConsumerInsightsViewDropdown({ selected, onSelect }) {
+/** Consumer-only: All Reviews / star rating filter for Reviews Given insights. */
+export default function ConsumerReviewsFilterDropdown({ selected, onSelect }) {
   const [showModal, setShowModal] = useState(false);
 
   return (
@@ -34,7 +34,7 @@ export default function ConsumerInsightsViewDropdown({ selected, onSelect }) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>View Insights</Text>
+              <Text style={styles.modalTitle}>Reviews</Text>
               <TouchableOpacity
                 onPress={() => setShowModal(false)}
                 style={styles.modalCloseButton}
@@ -43,7 +43,7 @@ export default function ConsumerInsightsViewDropdown({ selected, onSelect }) {
               </TouchableOpacity>
             </View>
             <FlatList
-              data={CONSUMER_INSIGHT_VIEWS}
+              data={CONSUMER_REVIEWS_FILTER_OPTIONS}
               keyExtractor={(item) => item}
               renderItem={({ item }) => {
                 const isSelected = selected === item;
@@ -57,7 +57,7 @@ export default function ConsumerInsightsViewDropdown({ selected, onSelect }) {
                   >
                     <View style={styles.checkSlot}>
                       {isSelected && (
-                        <Ionicons name="checkmark" size={20} color="#FFFFFF" />
+                        <Ionicons name="checkmark" size={20} color="#000000" />
                       )}
                     </View>
                     <Text
@@ -80,6 +80,7 @@ export default function ConsumerInsightsViewDropdown({ selected, onSelect }) {
 }
 
 const styles = StyleSheet.create({
+  // Subtle border vs primary View Insights dropdown (white border on parent).
   dropdownButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -87,7 +88,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#2C2C2E",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#FFFFFF",
+    borderColor: "#48484A",
     paddingHorizontal: 16,
     paddingVertical: 14,
     minHeight: 52,
@@ -105,7 +106,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#1F2937",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: "70%",
+    maxHeight: "55%",
     paddingBottom: 40,
   },
   modalHeader: {
@@ -133,7 +134,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#374151",
   },
   modalItemSelected: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#E5E7EB",
   },
   checkSlot: {
     width: 28,

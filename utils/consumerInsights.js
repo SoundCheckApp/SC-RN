@@ -8,6 +8,22 @@ export const CONSUMER_INSIGHT_VIEWS = [
 
 export const CONSUMER_TIPS_TIME_FRAMES = ["Weekly", "Monthly", "Yearly"];
 
+export const CONSUMER_REVIEWS_FILTER_OPTIONS = [
+  "All Reviews",
+  "5 Stars",
+  "4 Stars",
+  "3 Stars",
+  "2 Stars",
+  "1 Star",
+];
+
+/** @returns {number|null} star count, or null for "All Reviews" */
+export function parseReviewsFilterStars(label) {
+  if (!label || label === "All Reviews") return null;
+  const n = parseInt(String(label), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
 function startOfDay(d) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
