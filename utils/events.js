@@ -13,6 +13,14 @@ export const EVENT_TIME_FRAME_OPTIONS = [
   "Past Year",
 ];
 
+/** Consumer → My Events: in-memory sort (full history, no date window). */
+export const CONSUMER_EVENT_SORT_OPTIONS = [
+  "Date (Newest First)",
+  "Location (A-Z)",
+  "Rating (Highest First)",
+  "Tips (Highest First)",
+];
+
 function startOfWeekMonday(d) {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const day = x.getDay();
@@ -83,6 +91,21 @@ function toISODate(d) {
   return `${y}-${m}-${day}`;
 }
 
+/** `consumer_checkins.event_date` (YYYY-MM-DD) → display string. */
+export function formatCheckinEventDate(isoDate) {
+  if (!isoDate) return "";
+  const parts = String(isoDate).split("-").map(Number);
+  if (parts.length < 3) return String(isoDate);
+  const [y, m, d] = parts;
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 /** Sum `consumer_tips.amount` rows when Supabase embeds them on the check-in row. */
 function sumEmbeddedTips(embedded) {
   if (!embedded || !Array.isArray(embedded)) return 0;
@@ -114,6 +137,111 @@ export function summarizeEvents(events) {
       ? null
       : rated.reduce((s, e) => s + Number(e.rating), 0) / rated.length;
   return { totalEvents, totalTips, avgRating };
+}
+
+/**
+ * @typedef {{ id: string, eventDate: string, eventStartTime: string | null, tipsAmount: number, rating: number | null, location: string, artistName: string }} ConsumerEventRow
+ */
+
+function artistNameFromCheckinRow(row) {
+  let m = row.musicians;
+  if (Array.isArray(m)) m = m[0];
+  const name = m?.artist_name?.trim() || m?.username?.trim();
+  return name || "Artist";
+}
+
+/**
+ * Sort consumer event rows (client-side). Date uses `event_date` then `event_start_time`.
+ * @param {ConsumerEventRow[]} events
+ * @param {string} sortLabel One of CONSUMER_EVENT_SORT_OPTIONS
+ */
+export function sortConsumerEvents(events, sortLabel) {
+  const copy = [...events];
+  switch (sortLabel) {
+    case "Date (Newest First)":
+      return copy.sort((a, b) => {
+        const dc = String(b.eventDate).localeCompare(String(a.eventDate));
+        if (dc !== 0) return dc;
+        return String(b.eventStartTime || "").localeCompare(
+          String(a.eventStartTime || "")
+        );
+      });
+    case "Location (A-Z)":
+      return copy.sort((a, b) => {
+        const la = (a.location || "").toLowerCase();
+        const lb = (b.location || "").toLowerCase();
+        if (!la && !lb) return 0;
+        if (!la) return 1;
+        if (!lb) return -1;
+        return la.localeCompare(lb, undefined, { sensitivity: "base" });
+      });
+    case "Rating (Highest First)":
+      return copy.sort((a, b) => {
+        const ra = a.rating == null || Number.isNaN(Number(a.rating)) ? -1 : Number(a.rating);
+        const rb = b.rating == null || Number.isNaN(Number(b.rating)) ? -1 : Number(b.rating);
+        return rb - ra;
+      });
+    case "Tips (Highest First)":
+      return copy.sort(
+        (a, b) => (Number(b.tipsAmount) || 0) - (Number(a.tipsAmount) || 0)
+      );
+    default:
+      return copy;
+  }
+}
+
+/**
+ * All check-ins for a consumer (`consumer_id` = auth user id). No calendar window.
+ * Requires RLS: consumer can `SELECT` own rows on `consumer_checkins`.
+ */
+export async function fetchConsumerEvents(consumerId) {
+  if (!consumerId) {
+    return { events: [], error: null };
+  }
+
+  const trySelect = async (columns) =>
+    supabase
+      .from("consumer_checkins")
+      .select(columns)
+      .eq("consumer_id", consumerId)
+      .order("event_date", { ascending: false })
+      .order("event_start_time", { ascending: false });
+
+  const columnVariants = [
+    "id, event_date, event_start_time, location, tip_amount, rating, consumer_tips ( amount ), musicians ( artist_name, username )",
+    "id, event_date, event_start_time, location, tip_amount, rating, consumer_tips ( amount )",
+    "id, event_date, event_start_time, location, tip_amount, rating, musicians ( artist_name, username )",
+    "id, event_date, event_start_time, location, tip_amount, rating",
+  ];
+
+  let data = null;
+  let lastError = null;
+  for (const columns of columnVariants) {
+    const { data: rows, error } = await trySelect(columns);
+    if (!error) {
+      data = rows;
+      lastError = null;
+      break;
+    }
+    lastError = error;
+  }
+
+  if (lastError) {
+    console.warn("fetchConsumerEvents:", lastError.message);
+    return { events: [], error: lastError };
+  }
+
+  const events = (data ?? []).map((row) => ({
+    id: row.id,
+    eventDate: row.event_date,
+    eventStartTime: row.event_start_time ?? null,
+    tipsAmount: tipsAmountForCheckinRow(row),
+    rating: row.rating != null ? Number(row.rating) : null,
+    location: typeof row.location === "string" ? row.location.trim() : "",
+    artistName: artistNameFromCheckinRow(row),
+  }));
+
+  return { events, error: null };
 }
 
 /**

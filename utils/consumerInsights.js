@@ -8,6 +8,9 @@ export const CONSUMER_INSIGHT_VIEWS = [
 
 export const CONSUMER_TIPS_TIME_FRAMES = ["Weekly", "Monthly", "Yearly"];
 
+/** Following insights: sort mode (expand later, e.g. A–Z vs recent). */
+export const CONSUMER_FOLLOWING_SORT_OPTIONS = ["All"];
+
 export const CONSUMER_REVIEWS_FILTER_OPTIONS = [
   "All Reviews",
   "5 Stars",
@@ -150,6 +153,28 @@ export async function fetchConsumerReviewsGiven(consumerId) {
   return { reviews: data ?? [], error: null };
 }
 
+export function followRowMusician(row) {
+  let m = row?.musicians;
+  if (Array.isArray(m)) return m[0] ?? null;
+  return m ?? null;
+}
+
+/** Sort label for list + A–Z ordering when sort is "All". */
+export function followListDisplayName(row) {
+  const m = followRowMusician(row);
+  if (m?.artist_name?.trim()) return m.artist_name.trim();
+  if (m?.username?.trim()) return m.username.trim();
+  return `Musician ${String(row.musician_id || "").slice(0, 8)}`;
+}
+
+export function sortFollowsAlphabetically(follows) {
+  return [...follows].sort((a, b) =>
+    followListDisplayName(a).localeCompare(followListDisplayName(b), undefined, {
+      sensitivity: "base",
+    })
+  );
+}
+
 export async function fetchConsumerFollowingRows(consumerId) {
   if (!consumerId) {
     return { follows: [], error: null };
@@ -157,19 +182,31 @@ export async function fetchConsumerFollowingRows(consumerId) {
   let { data, error } = await supabase
     .from("consumer_follows")
     .select(
-      "id, musician_id, created_at, musicians ( artist_name, username )"
+      "id, musician_id, created_at, musicians ( id, artist_name, username, genres )"
     )
     .eq("consumer_id", consumerId)
     .order("created_at", { ascending: false });
 
   if (error) {
-    const retry = await supabase
+    const retryNames = await supabase
       .from("consumer_follows")
-      .select("id, musician_id, created_at")
+      .select(
+        "id, musician_id, created_at, musicians ( id, artist_name, username )"
+      )
       .eq("consumer_id", consumerId)
       .order("created_at", { ascending: false });
-    data = retry.data;
-    error = retry.error;
+    if (!retryNames.error) {
+      data = retryNames.data;
+      error = null;
+    } else {
+      const retry = await supabase
+        .from("consumer_follows")
+        .select("id, musician_id, created_at")
+        .eq("consumer_id", consumerId)
+        .order("created_at", { ascending: false });
+      data = retry.data;
+      error = retry.error;
+    }
   }
 
   if (error) {
