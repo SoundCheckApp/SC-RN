@@ -183,10 +183,9 @@ CREATE POLICY "Users can view their own consumer record"
   USING (auth.uid() = id);
 
 -- Users can insert their own consumer record
-CREATE POLICY "Users can insert their own consumer record"
-  ON consumers FOR INSERT
-  WITH CHECK (auth.uid() = id);
 
+CREATE POLICY "Users can insert their own consumer record"
+  ON consumers FOR INSERT 
 -- Users can update their own consumer record
 CREATE POLICY "Users can update their own consumer record"
   ON consumers FOR UPDATE
