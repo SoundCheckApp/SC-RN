@@ -105,7 +105,10 @@ export default function ConsumerProfileScreen() {
 
         {profile.preferredGenre ? (
           <Text style={styles.metaRow}>
-            Preferred genre: {profile.preferredGenre}
+            {String(profile.preferredGenre).includes(",")
+              ? "Preferred genres"
+              : "Preferred genre"}
+            : {profile.preferredGenre}
           </Text>
         ) : null}
 
