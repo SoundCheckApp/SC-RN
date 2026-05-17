@@ -1,74 +1,84 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import NearbyMusiciansMap from "../../components/NearbyMusiciansMap";
+import {
+  formatLiveMusicianForUI,
+  getNearbyLiveMusicians,
+} from "../../utils/consumer";
+import { getCurrentCoordinates } from "../../utils/location";
 
 export default function MusicConsumerHomepage() {
-  const [radius, setRadius] = useState(5); // Default 5 miles
+  const [radius, setRadius] = useState(5);
   const [nearbyMusicians, setNearbyMusicians] = useState([]);
   const [selectedMusician, setSelectedMusician] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
+  const [locationError, setLocationError] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const scrollViewRef = useRef(null);
 
-  useEffect(() => {
-    loadNearbyMusicians();
-  }, [radius]);
-
-  const loadNearbyMusicians = async () => {
+  const loadNearbyMusicians = useCallback(async () => {
     setIsLoading(true);
+    setLocationError(null);
+
     try {
-      // TODO: Get user's current location
-      // For now, using mock data structure
-      // In production, you'll:
-      // 1. Get user location using expo-location
-      // 2. Query musicians table for those within radius
-      // 3. Filter by is_live = true
+      const { coords, error: locError } = await getCurrentCoordinates();
+      if (locError || !coords) {
+        setUserLocation(null);
+        setNearbyMusicians([]);
+        setLocationError(locError?.message ?? "Location unavailable.");
+        return;
+      }
 
-      // Mock data structure - replace with actual Supabase query
-      const mockMusicians = [
-        {
-          id: "1",
-          name: "Jazz Player",
-          genre: "Jazz",
-          location: { lat: 40.7128, lng: -74.006 },
-          isOfficial: false,
-        },
-        {
-          id: "2",
-          name: "SoundCheck Music",
-          genre: "World",
-          location: { lat: 40.715, lng: -74.008 },
-          isOfficial: true,
-        },
-      ];
+      setUserLocation(coords);
 
-      // TODO: Replace with actual query:
-      // const { data, error } = await supabase
-      //   .from("musicians")
-      //   .select("*")
-      //   .eq("is_live", true)
-      //   .within("location", userLocation, radius);
+      const { musicians, error } = await getNearbyLiveMusicians(
+        coords.latitude,
+        coords.longitude,
+        radius
+      );
 
-      setNearbyMusicians(mockMusicians);
+      if (error) {
+        console.error("getNearbyLiveMusicians:", error);
+        if (
+          error.message?.includes("latitude") ||
+          error.message?.includes("is_live") ||
+          error.code === "42703"
+        ) {
+          setLocationError(
+            "Map database is not ready. Run supabase_musicians_live_location.sql in Supabase."
+          );
+        } else {
+          setLocationError(error.message ?? "Could not load nearby musicians.");
+        }
+        setNearbyMusicians([]);
+        return;
+      }
+
+      setNearbyMusicians(musicians.map(formatLiveMusicianForUI));
     } catch (error) {
       console.error("Error loading nearby musicians:", error);
+      setLocationError("Something went wrong loading nearby musicians.");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [radius]);
 
-  const handleMarkerPress = (musician) => {
-    setSelectedMusician(musician.id);
-    // Scroll to the musician's listing
-    const index = nearbyMusicians.findIndex((m) => m.id === musician.id);
+  useEffect(() => {
+    loadNearbyMusicians();
+  }, [loadNearbyMusicians]);
+
+  const handleMarkerPress = ({ id }) => {
+    setSelectedMusician(id);
+    const index = nearbyMusicians.findIndex((m) => m.id === id);
     if (index !== -1 && scrollViewRef.current) {
       scrollViewRef.current.scrollTo({ y: index * 100, animated: true });
     }
@@ -82,10 +92,13 @@ export default function MusicConsumerHomepage() {
     setSelectedMusician(musician.id);
   };
 
+  const handleRetryLocation = () => {
+    loadNearbyMusicians();
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.content}>
-        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Nearby Musicians</Text>
           <TouchableOpacity style={styles.searchButton}>
@@ -93,7 +106,6 @@ export default function MusicConsumerHomepage() {
           </TouchableOpacity>
         </View>
 
-        {/* Radius Selector */}
         <View style={styles.radiusContainer}>
           <Text style={styles.radiusLabel}>Radius:</Text>
           <View style={styles.radiusButtons}>
@@ -119,40 +131,28 @@ export default function MusicConsumerHomepage() {
           </View>
         </View>
 
-        {/* Map Section */}
         <View style={styles.mapContainer}>
-          <View style={styles.mapPlaceholder}>
-            <Text style={styles.mapText}>
-              Map showing musicians within {radius} miles
-            </Text>
-
-            {/* User Location Marker */}
-            <View style={styles.userMarker}>
-              <Ionicons name="location" size={24} color="#3B82F6" />
-              <View style={styles.userMarkerCircle} />
-            </View>
-
-            {/* Musician Markers */}
-            {nearbyMusicians.map((musician, index) => (
+          {locationError ? (
+            <View style={styles.locationErrorBox}>
+              <Text style={styles.locationErrorText}>{locationError}</Text>
               <TouchableOpacity
-                key={musician.id}
-                style={[
-                  styles.musicianMarker,
-                  {
-                    left: `${30 + index * 20}%`,
-                    top: `${40 + index * 15}%`,
-                  },
-                  selectedMusician === musician.id && styles.musicianMarkerSelected,
-                ]}
-                onPress={() => handleMarkerPress(musician)}
+                style={styles.retryButton}
+                onPress={handleRetryLocation}
               >
-                <View style={styles.musicianMarkerDot} />
+                <Text style={styles.retryButtonText}>Try again</Text>
               </TouchableOpacity>
-            ))}
-          </View>
+            </View>
+          ) : (
+            <NearbyMusiciansMap
+              userLocation={userLocation}
+              musicians={nearbyMusicians}
+              radiusMiles={radius}
+              selectedMusicianId={selectedMusician}
+              onMarkerPress={handleMarkerPress}
+            />
+          )}
         </View>
 
-        {/* Musicians List */}
         <ScrollView
           ref={scrollViewRef}
           style={styles.listContainer}
@@ -160,7 +160,7 @@ export default function MusicConsumerHomepage() {
         >
           {isLoading ? (
             <Text style={styles.loadingText}>Loading nearby musicians...</Text>
-          ) : nearbyMusicians.length === 0 ? (
+          ) : locationError ? null : nearbyMusicians.length === 0 ? (
             <Text style={styles.emptyText}>
               No musicians live in your area within {radius} miles
             </Text>
@@ -178,7 +178,14 @@ export default function MusicConsumerHomepage() {
                 <View style={styles.musicianCardContent}>
                   <View style={styles.musicianInfo}>
                     <Text style={styles.musicianName}>{musician.name}</Text>
-                    <Text style={styles.musicianGenre}>Genre: {musician.genre}</Text>
+                    <Text style={styles.musicianGenre}>
+                      Genre: {musician.genre || "—"}
+                    </Text>
+                    {musician.distance != null && (
+                      <Text style={styles.distanceText}>
+                        {musician.distance.toFixed(1)} mi away
+                      </Text>
+                    )}
                     {musician.isOfficial && (
                       <Text style={styles.officialBadge}>
                         Official SoundCheck Account
@@ -264,52 +271,29 @@ const styles = StyleSheet.create({
     height: 300,
     marginBottom: 20,
   },
-  mapPlaceholder: {
+  locationErrorBox: {
     flex: 1,
     backgroundColor: "#374151",
     borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
-    position: "relative",
-    overflow: "hidden",
+    padding: 20,
   },
-  mapText: {
+  locationErrorText: {
     fontSize: 14,
-    color: "#9CA3AF",
+    color: "#FCA5A5",
     textAlign: "center",
-    zIndex: 1,
+    marginBottom: 12,
   },
-  userMarker: {
-    position: "absolute",
-    top: "45%",
-    left: "45%",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 10,
-  },
-  userMarkerCircle: {
-    position: "absolute",
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "rgba(59, 130, 246, 0.2)",
-    borderWidth: 2,
-    borderColor: "#3B82F6",
-  },
-  musicianMarker: {
-    position: "absolute",
-    zIndex: 5,
-  },
-  musicianMarkerSelected: {
-    zIndex: 15,
-  },
-  musicianMarkerDot: {
-    width: 16,
-    height: 16,
+  retryButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: "#A855F7",
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
+    backgroundColor: "#4F46E5",
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
   listContainer: {
     flex: 1,
@@ -347,6 +331,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#9CA3AF",
     marginBottom: 4,
+  },
+  distanceText: {
+    fontSize: 12,
+    color: "#6B7280",
   },
   officialBadge: {
     fontSize: 12,

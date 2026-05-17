@@ -325,13 +325,7 @@ export const getNearbyLiveMusicians = async (latitude, longitude, radiusMiles) =
     
     const { data: musicians, error } = await supabase
       .from("musicians")
-      .select(`
-        *,
-        profiles:profile_id (
-          id,
-          full_name
-        )
-      `)
+      .select("id, artist_name, username, genres, latitude, longitude, is_live")
       .eq("is_live", true)
       .gte("latitude", minLat)
       .lte("latitude", maxLat)
@@ -364,6 +358,28 @@ export const getNearbyLiveMusicians = async (latitude, longitude, radiusMiles) =
     console.error("Error getting nearby musicians:", error);
     return { musicians: [], error: { message: error.message } };
   }
+};
+
+/**
+ * Map a live musician row to the consumer homepage list/map shape.
+ */
+export const formatLiveMusicianForUI = (row) => {
+  const genre =
+    typeof row.genres === "string" && row.genres.trim()
+      ? row.genres.split(",")[0].trim()
+      : "";
+
+  return {
+    id: row.id,
+    name: row.artist_name?.trim() || row.username?.trim() || "Musician",
+    genre,
+    location: {
+      lat: row.latitude,
+      lng: row.longitude,
+    },
+    distance: row.distance ?? null,
+    isOfficial: false,
+  };
 };
 
 /**
