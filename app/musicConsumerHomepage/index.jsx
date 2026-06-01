@@ -1,73 +1,148 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Location from "expo-location";
 import { router } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getNearbyLiveMusicians } from "../../utils/consumer";
+import { searchMusicians } from "../../utils/musicianDiscovery";
+
+function MusicianCard({ musician, selected, onSelect, onViewProfile }) {
+  return (
+    <TouchableOpacity
+      style={[styles.musicianCard, selected && styles.musicianCardSelected]}
+      onPress={() => onSelect(musician)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.musicianCardContent}>
+        <View style={styles.musicianInfo}>
+          <View style={styles.nameRow}>
+            <Text style={styles.musicianName}>{musician.name}</Text>
+            {musician.isLive && (
+              <View style={styles.liveBadge}>
+                <Text style={styles.liveBadgeText}>LIVE</Text>
+              </View>
+            )}
+          </View>
+          {musician.genre ? (
+            <Text style={styles.musicianGenre}>Genre: {musician.genre}</Text>
+          ) : null}
+          {musician.location ? (
+            <Text style={styles.musicianLocation}>{musician.location}</Text>
+          ) : null}
+          {musician.distance != null && (
+            <Text style={styles.distanceText}>
+              {musician.distance.toFixed(1)} mi away
+            </Text>
+          )}
+        </View>
+        <TouchableOpacity
+          style={styles.viewButton}
+          onPress={() => onViewProfile(musician.id)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.viewButtonText}>VIEW</Text>
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 export default function MusicConsumerHomepage() {
-  const [radius, setRadius] = useState(5); // Default 5 miles
+  const [radius, setRadius] = useState(5);
   const [nearbyMusicians, setNearbyMusicians] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [selectedMusician, setSelectedMusician] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [locationError, setLocationError] = useState(null);
+  const [isLoadingNearby, setIsLoadingNearby] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
   const scrollViewRef = useRef(null);
+
+  const loadNearbyMusicians = useCallback(async () => {
+    setIsLoadingNearby(true);
+    setLocationError(null);
+    try {
+      let coords = userLocation;
+
+      if (!coords) {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          setLocationError("Location permission is required to find nearby musicians.");
+          setNearbyMusicians([]);
+          return;
+        }
+
+        const position = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        coords = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
+        setUserLocation(coords);
+      }
+
+      const { musicians, error } = await getNearbyLiveMusicians(
+        coords.latitude,
+        coords.longitude,
+        radius
+      );
+
+      if (error) {
+        console.error("Error loading nearby musicians:", error);
+        setNearbyMusicians([]);
+        return;
+      }
+
+      setNearbyMusicians(musicians);
+    } catch (error) {
+      console.error("Error loading nearby musicians:", error);
+      setNearbyMusicians([]);
+    } finally {
+      setIsLoadingNearby(false);
+    }
+  }, [radius, userLocation]);
 
   useEffect(() => {
     loadNearbyMusicians();
-  }, [radius]);
+  }, [loadNearbyMusicians]);
 
-  const loadNearbyMusicians = async () => {
-    setIsLoading(true);
-    try {
-      // TODO: Get user's current location
-      // For now, using mock data structure
-      // In production, you'll:
-      // 1. Get user location using expo-location
-      // 2. Query musicians table for those within radius
-      // 3. Filter by is_live = true
-
-      // Mock data structure - replace with actual Supabase query
-      const mockMusicians = [
-        {
-          id: "1",
-          name: "Jazz Player",
-          genre: "Jazz",
-          location: { lat: 40.7128, lng: -74.006 },
-          isOfficial: false,
-        },
-        {
-          id: "2",
-          name: "SoundCheck Music",
-          genre: "World",
-          location: { lat: 40.715, lng: -74.008 },
-          isOfficial: true,
-        },
-      ];
-
-      // TODO: Replace with actual query:
-      // const { data, error } = await supabase
-      //   .from("musicians")
-      //   .select("*")
-      //   .eq("is_live", true)
-      //   .within("location", userLocation, radius);
-
-      setNearbyMusicians(mockMusicians);
-    } catch (error) {
-      console.error("Error loading nearby musicians:", error);
-    } finally {
-      setIsLoading(false);
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
     }
-  };
+
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      const { musicians, error } = await searchMusicians(q);
+      if (error) {
+        console.error("Search error:", error);
+        setSearchResults([]);
+      } else {
+        setSearchResults(musicians);
+      }
+      setIsSearching(false);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const handleMarkerPress = (musician) => {
     setSelectedMusician(musician.id);
-    // Scroll to the musician's listing
     const index = nearbyMusicians.findIndex((m) => m.id === musician.id);
     if (index !== -1 && scrollViewRef.current) {
       scrollViewRef.current.scrollTo({ y: index * 100, animated: true });
@@ -78,24 +153,49 @@ export default function MusicConsumerHomepage() {
     router.push(`/musicianProfile/${musicianId}`);
   };
 
-  const handleListingPress = (musician) => {
-    setSelectedMusician(musician.id);
-  };
+  const showSearchResults = searchQuery.trim().length >= 2;
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.content}>
-        {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Nearby Musicians</Text>
-          <TouchableOpacity style={styles.searchButton}>
-            <Ionicons name="search" size={24} color="#FFFFFF" />
+          <Text style={styles.title}>Discover Musicians</Text>
+          <TouchableOpacity
+            style={styles.searchButton}
+            onPress={() => setSearchOpen((v) => !v)}
+          >
+            <Ionicons
+              name={searchOpen ? "close" : "search"}
+              size={24}
+              color="#FFFFFF"
+            />
           </TouchableOpacity>
         </View>
 
-        {/* Radius Selector */}
+        {searchOpen && (
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color="#9CA3AF" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by name, genre, or location..."
+              placeholderTextColor="#6B7280"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoFocus
+              returnKeyType="search"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery("")}>
+                <Ionicons name="close-circle" size={20} color="#6B7280" />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
         <View style={styles.radiusContainer}>
-          <Text style={styles.radiusLabel}>Radius:</Text>
+          <Text style={styles.radiusLabel}>Nearby radius:</Text>
           <View style={styles.radiusButtons}>
             {[1, 2, 3, 4, 5].map((mile) => (
               <TouchableOpacity
@@ -119,20 +219,20 @@ export default function MusicConsumerHomepage() {
           </View>
         </View>
 
-        {/* Map Section */}
         <View style={styles.mapContainer}>
           <View style={styles.mapPlaceholder}>
             <Text style={styles.mapText}>
-              Map showing musicians within {radius} miles
+              {locationError ||
+                `Map showing live musicians within ${radius} miles`}
             </Text>
 
-            {/* User Location Marker */}
-            <View style={styles.userMarker}>
-              <Ionicons name="location" size={24} color="#3B82F6" />
-              <View style={styles.userMarkerCircle} />
-            </View>
+            {userLocation && (
+              <View style={styles.userMarker}>
+                <Ionicons name="location" size={24} color="#3B82F6" />
+                <View style={styles.userMarkerCircle} />
+              </View>
+            )}
 
-            {/* Musician Markers */}
             {nearbyMusicians.map((musician, index) => (
               <TouchableOpacity
                 key={musician.id}
@@ -152,50 +252,57 @@ export default function MusicConsumerHomepage() {
           </View>
         </View>
 
-        {/* Musicians List */}
         <ScrollView
           ref={scrollViewRef}
           style={styles.listContainer}
           contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
         >
-          {isLoading ? (
-            <Text style={styles.loadingText}>Loading nearby musicians...</Text>
-          ) : nearbyMusicians.length === 0 ? (
-            <Text style={styles.emptyText}>
-              No musicians live in your area within {radius} miles
-            </Text>
-          ) : (
-            nearbyMusicians.map((musician) => (
-              <TouchableOpacity
-                key={musician.id}
-                style={[
-                  styles.musicianCard,
-                  selectedMusician === musician.id && styles.musicianCardSelected,
-                ]}
-                onPress={() => handleListingPress(musician)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.musicianCardContent}>
-                  <View style={styles.musicianInfo}>
-                    <Text style={styles.musicianName}>{musician.name}</Text>
-                    <Text style={styles.musicianGenre}>Genre: {musician.genre}</Text>
-                    {musician.isOfficial && (
-                      <Text style={styles.officialBadge}>
-                        Official SoundCheck Account
-                      </Text>
-                    )}
-                  </View>
-                  <TouchableOpacity
-                    style={styles.viewButton}
-                    onPress={() => handleViewProfile(musician.id)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.viewButtonText}>VIEW</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            ))
+          {showSearchResults && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Search Results</Text>
+              {isSearching ? (
+                <ActivityIndicator color="#A855F7" style={styles.loader} />
+              ) : searchResults.length === 0 ? (
+                <Text style={styles.emptyText}>
+                  No musicians match &quot;{searchQuery.trim()}&quot;
+                </Text>
+              ) : (
+                searchResults.map((musician) => (
+                  <MusicianCard
+                    key={`search-${musician.id}`}
+                    musician={musician}
+                    selected={selectedMusician === musician.id}
+                    onSelect={(m) => setSelectedMusician(m.id)}
+                    onViewProfile={handleViewProfile}
+                  />
+                ))
+              )}
+            </View>
           )}
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Nearby Live</Text>
+            {isLoadingNearby ? (
+              <ActivityIndicator color="#A855F7" style={styles.loader} />
+            ) : locationError ? (
+              <Text style={styles.emptyText}>{locationError}</Text>
+            ) : nearbyMusicians.length === 0 ? (
+              <Text style={styles.emptyText}>
+                No live musicians within {radius} miles
+              </Text>
+            ) : (
+              nearbyMusicians.map((musician) => (
+                <MusicianCard
+                  key={`nearby-${musician.id}`}
+                  musician={musician}
+                  selected={selectedMusician === musician.id}
+                  onSelect={(m) => setSelectedMusician(m.id)}
+                  onViewProfile={handleViewProfile}
+                />
+              ))
+            )}
+          </View>
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -216,7 +323,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 16,
   },
   title: {
     fontSize: 28,
@@ -226,19 +333,37 @@ const styles = StyleSheet.create({
   searchButton: {
     padding: 8,
   },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1F2937",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 16,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: "#FFFFFF",
+  },
   radiusContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 16,
+    flexWrap: "wrap",
+    gap: 8,
   },
   radiusLabel: {
     fontSize: 16,
     color: "#FFFFFF",
-    marginRight: 12,
+    marginRight: 4,
   },
   radiusButtons: {
     flexDirection: "row",
     gap: 8,
+    flexWrap: "wrap",
   },
   radiusButton: {
     paddingHorizontal: 16,
@@ -261,8 +386,8 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   mapContainer: {
-    height: 300,
-    marginBottom: 20,
+    height: 220,
+    marginBottom: 16,
   },
   mapPlaceholder: {
     flex: 1,
@@ -277,6 +402,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#9CA3AF",
     textAlign: "center",
+    paddingHorizontal: 16,
     zIndex: 1,
   },
   userMarker: {
@@ -317,6 +443,15 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 20,
   },
+  section: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    marginBottom: 12,
+  },
   musicianCard: {
     backgroundColor: "#1F2937",
     borderRadius: 12,
@@ -327,7 +462,6 @@ const styles = StyleSheet.create({
   },
   musicianCardSelected: {
     borderColor: "#A855F7",
-    backgroundColor: "#1F2937",
   },
   musicianCardContent: {
     flexDirection: "row",
@@ -336,22 +470,43 @@ const styles = StyleSheet.create({
   },
   musicianInfo: {
     flex: 1,
+    marginRight: 12,
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
   },
   musicianName: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#FFFFFF",
-    marginBottom: 4,
+  },
+  liveBadge: {
+    backgroundColor: "#DC2626",
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  liveBadgeText: {
+    fontSize: 10,
+    fontWeight: "bold",
+    color: "#FFFFFF",
   },
   musicianGenre: {
     fontSize: 14,
     color: "#9CA3AF",
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  officialBadge: {
-    fontSize: 12,
+  musicianLocation: {
+    fontSize: 13,
+    color: "#6B7280",
+  },
+  distanceText: {
+    fontSize: 13,
     color: "#A855F7",
-    fontWeight: "500",
+    marginTop: 4,
   },
   viewButton: {
     backgroundColor: "#A855F7",
@@ -364,16 +519,13 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#FFFFFF",
   },
-  loadingText: {
-    fontSize: 16,
-    color: "#9CA3AF",
-    textAlign: "center",
-    marginTop: 40,
+  loader: {
+    marginTop: 24,
   },
   emptyText: {
     fontSize: 16,
     color: "#9CA3AF",
     textAlign: "center",
-    marginTop: 40,
+    marginTop: 16,
   },
 });

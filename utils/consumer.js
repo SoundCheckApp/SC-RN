@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase";
+import { normalizeMusicianCard } from "./musicianDiscovery";
 
 /** Same list as consumer signup — used for Preferred Genre picker in Account settings. */
 export const CONSUMER_GENRE_OPTIONS = [
@@ -376,14 +377,12 @@ export const getNearbyLiveMusicians = async (latitude, longitude, radiusMiles) =
     
     const { data: musicians, error } = await supabase
       .from("musicians")
-      .select(`
-        *,
-        profiles:profile_id (
-          id,
-          full_name
-        )
-      `)
+      .select(
+        "id, artist_name, username, genres, location, latitude, longitude, is_live, first_name, last_name"
+      )
       .eq("is_live", true)
+      .not("latitude", "is", null)
+      .not("longitude", "is", null)
       .gte("latitude", minLat)
       .lte("latitude", maxLat)
       .gte("longitude", minLng)
@@ -410,7 +409,10 @@ export const getNearbyLiveMusicians = async (latitude, longitude, radiusMiles) =
       .filter((musician) => musician.distance <= radiusMiles)
       .sort((a, b) => a.distance - b.distance);
 
-    return { musicians: musiciansWithDistance, error: null };
+    return {
+      musicians: musiciansWithDistance.map(normalizeMusicianCard),
+      error: null,
+    };
   } catch (error) {
     console.error("Error getting nearby musicians:", error);
     return { musicians: [], error: { message: error.message } };
