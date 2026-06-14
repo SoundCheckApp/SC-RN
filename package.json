@@ -11,7 +11,8 @@
     "ios": "expo start --ios --localhost",
     "ios:lan": "expo start --ios --lan",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "test:search": "node scripts/test-musician-search.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

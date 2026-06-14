@@ -13,7 +13,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getNearbyLiveMusicians } from "../../utils/consumer";
-import { searchMusicians } from "../../utils/musicianDiscovery";
+import {
+  probeMusicianDiscoveryAccess,
+  searchMusicians,
+} from "../../utils/musicianDiscovery";
 
 function MusicianCard({ musician, selected, onSelect, onViewProfile }) {
   return (
@@ -67,6 +70,8 @@ export default function MusicConsumerHomepage() {
   const [locationError, setLocationError] = useState(null);
   const [isLoadingNearby, setIsLoadingNearby] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+  const [searchAccessHint, setSearchAccessHint] = useState(null);
   const scrollViewRef = useRef(null);
 
   const loadNearbyMusicians = useCallback(async () => {
@@ -119,21 +124,46 @@ export default function MusicConsumerHomepage() {
   }, [loadNearbyMusicians]);
 
   useEffect(() => {
+    if (!searchOpen) return;
+
+    probeMusicianDiscoveryAccess().then(({ error, hint }) => {
+      if (error) {
+        setSearchAccessHint(
+          error.message || "Could not verify musician search access."
+        );
+      } else {
+        setSearchAccessHint(hint);
+      }
+    });
+  }, [searchOpen]);
+
+  useEffect(() => {
     const q = searchQuery.trim();
     if (q.length < 2) {
       setSearchResults([]);
+      setSearchError(null);
       setIsSearching(false);
       return;
     }
 
     setIsSearching(true);
+    setSearchError(null);
     const timer = setTimeout(async () => {
       const { musicians, error } = await searchMusicians(q);
       if (error) {
         console.error("Search error:", error);
         setSearchResults([]);
+        setSearchError(
+          error.message ||
+            "Search failed. Check Metro logs and Supabase RLS policies."
+        );
       } else {
         setSearchResults(musicians);
+        setSearchError(null);
+        if (musicians.length === 0 && !searchAccessHint) {
+          const { hint } = await probeMusicianDiscoveryAccess();
+          if (hint) setSearchAccessHint(hint);
+        }
       }
       setIsSearching(false);
     }, 350);
@@ -261,6 +291,12 @@ export default function MusicConsumerHomepage() {
           {showSearchResults && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Search Results</Text>
+              {searchAccessHint ? (
+                <Text style={styles.hintText}>{searchAccessHint}</Text>
+              ) : null}
+              {searchError ? (
+                <Text style={styles.errorText}>{searchError}</Text>
+              ) : null}
               {isSearching ? (
                 <ActivityIndicator color="#A855F7" style={styles.loader} />
               ) : searchResults.length === 0 ? (
@@ -527,5 +563,17 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
     textAlign: "center",
     marginTop: 16,
+  },
+  hintText: {
+    fontSize: 14,
+    color: "#F59E0B",
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  errorText: {
+    fontSize: 14,
+    color: "#F87171",
+    marginBottom: 12,
+    lineHeight: 20,
   },
 });
