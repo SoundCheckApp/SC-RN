@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase";
+import { normalizeMusicianCard } from "./musicianDiscovery";
 
 /** Same list as consumer signup — used for Preferred Genre picker in Account settings. */
 export const CONSUMER_GENRE_OPTIONS = [
@@ -26,6 +27,38 @@ export const CONSUMER_GENRE_OPTIONS = [
 ];
 
 const BIO_MAX_LEN = 500;
+
+/** Max genres stored in `consumers.preferred_genre` (comma‑separated). */
+export const CONSUMER_MAX_GENRE_PICKS = 3;
+
+/** Parse DB string → ordered unique list, capped. */
+export function parsePreferredGenresFromStorage(s) {
+  if (!s || !String(s).trim()) return [];
+  const parts = String(s)
+    .split(/,\s*/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  const seen = new Set();
+  const out = [];
+  for (const p of parts) {
+    if (seen.has(p)) continue;
+    seen.add(p);
+    out.push(p);
+    if (out.length >= CONSUMER_MAX_GENRE_PICKS) break;
+  }
+  return out;
+}
+
+/** Save list to `preferred_genre` text column. */
+export function serializePreferredGenres(arr) {
+  if (!Array.isArray(arr)) return "";
+  return arr
+    .map((x) => String(x).trim())
+    .filter(Boolean)
+    .filter((g, i, a) => a.indexOf(g) === i)
+    .slice(0, CONSUMER_MAX_GENRE_PICKS)
+    .join(", ");
+}
 
 /**
  * Consumer row + profile email/avatar for Account settings.
@@ -74,11 +107,11 @@ export const getConsumerAccountForSettings = async () => {
 };
 
 /**
- * Updates editable consumer fields. Email is not written (read-only in UI; use Auth flows to change).
+ * Updates editable consumer fields. Does not change first/last name (set at signup).
+ * Email: updates Auth + `profiles` + `consumers` when changed, like musician settings.
  */
 export const updateConsumerEditableAccount = async ({
-  firstName,
-  lastName,
+  email,
   username,
   location,
   preferredGenre,
@@ -94,22 +127,41 @@ export const updateConsumerEditableAccount = async ({
       return { error: { message: "User not authenticated" } };
     }
 
+    const nextEmail = ((email ?? "").trim() || user.email || "").trim();
+    const authEmail = user.email?.toLowerCase() ?? "";
+    if (nextEmail && nextEmail.toLowerCase() !== authEmail) {
+      const { error: authEmailErr } = await supabase.auth.updateUser({
+        email: nextEmail,
+      });
+      if (authEmailErr) {
+        return { error: authEmailErr };
+      }
+    }
+
     const payload = {
-      first_name: (firstName ?? "").trim(),
-      last_name: (lastName ?? "").trim(),
+      email: nextEmail,
       username: (username ?? "").trim(),
       location: (location ?? "").trim(),
       preferred_genre: (preferredGenre ?? "").trim(),
       bio: (bio ?? "").trim().slice(0, BIO_MAX_LEN),
     };
 
-    const { error } = await supabase
+    const { error: cErr } = await supabase
       .from("consumers")
       .update(payload)
       .eq("id", user.id);
 
-    if (error) {
-      return { error };
+    if (cErr) {
+      return { error: cErr };
+    }
+
+    const { error: pErr } = await supabase
+      .from("profiles")
+      .update({ email: nextEmail })
+      .eq("id", user.id);
+
+    if (pErr) {
+      return { error: pErr };
     }
 
     return { error: null };
@@ -325,8 +377,12 @@ export const getNearbyLiveMusicians = async (latitude, longitude, radiusMiles) =
     
     const { data: musicians, error } = await supabase
       .from("musicians")
-      .select("id, artist_name, username, genres, latitude, longitude, is_live")
+      .select(
+        "id, artist_name, username, genres, location, latitude, longitude, is_live, first_name, last_name"
+      )
       .eq("is_live", true)
+      .not("latitude", "is", null)
+      .not("longitude", "is", null)
       .gte("latitude", minLat)
       .lte("latitude", maxLat)
       .gte("longitude", minLng)
@@ -353,7 +409,10 @@ export const getNearbyLiveMusicians = async (latitude, longitude, radiusMiles) =
       .filter((musician) => musician.distance <= radiusMiles)
       .sort((a, b) => a.distance - b.distance);
 
-    return { musicians: musiciansWithDistance, error: null };
+    return {
+      musicians: musiciansWithDistance.map(normalizeMusicianCard),
+      error: null,
+    };
   } catch (error) {
     console.error("Error getting nearby musicians:", error);
     return { musicians: [], error: { message: error.message } };

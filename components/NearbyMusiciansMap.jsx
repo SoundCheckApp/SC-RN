@@ -11,12 +11,12 @@ function zoomForRadiusMiles(miles) {
 
 function buildMarkers(musicians, selectedMusicianId) {
   return musicians
-    .filter((m) => m.location?.lat != null && m.location?.lng != null)
+    .filter((m) => m.latitude != null && m.longitude != null)
     .map((m) => ({
       id: m.id,
       coordinates: {
-        latitude: m.location.lat,
-        longitude: m.location.lng,
+        latitude: m.latitude,
+        longitude: m.longitude,
       },
       title: m.name,
       ...(Platform.OS === "ios"

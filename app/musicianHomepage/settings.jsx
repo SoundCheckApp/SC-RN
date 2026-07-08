@@ -26,12 +26,6 @@ import {
   uploadMusicianAvatar,
 } from "../../utils/musician";
 
-function ReadOnlySuffix() {
-  return (
-    <Ionicons name="lock-closed" size={18} color="#EF4444" style={styles.lockIcon} />
-  );
-}
-
 export default function SettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -235,15 +229,12 @@ export default function SettingsScreen() {
           </TouchableOpacity>
 
           <Text style={styles.label}>First Name</Text>
-          <View style={styles.inputRow}>
-            <TextInput
-              style={[styles.input, styles.inputDisabled, styles.inputFlex]}
-              value={firstName}
-              editable={false}
-              placeholderTextColor="#9CA3AF"
-            />
-            <ReadOnlySuffix />
-          </View>
+          <TextInput
+            style={[styles.input, styles.inputDisabled]}
+            value={firstName}
+            editable={false}
+            placeholderTextColor="#9CA3AF"
+          />
 
           <Text style={styles.label}>Last Name</Text>
           <TextInput
@@ -466,17 +457,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#2C2C2E",
     color: "#FFFFFF",
   },
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 16,
-  },
-  inputFlex: {
-    flex: 1,
-    marginBottom: 0,
-  },
-  lockIcon: {},
   bioInput: {
     minHeight: 120,
     paddingTop: Platform.OS === "ios" ? 14 : 10,

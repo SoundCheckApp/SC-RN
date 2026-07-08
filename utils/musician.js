@@ -208,17 +208,36 @@ export const getMusicianProfile = async () => {
  */
 export const getMusicianProfileById = async (profileId) => {
   try {
-    const { data: profile, error: profileError } = await supabase
-      .from("musicians")
-      .select("*")
-      .eq("id", profileId)
-      .single();
+    const [musicianRes, profileRes] = await Promise.all([
+      supabase.from("musicians").select("*").eq("id", profileId).single(),
+      supabase
+        .from("profiles")
+        .select("avatar_url")
+        .eq("id", profileId)
+        .maybeSingle(),
+    ]);
 
-    if (profileError) {
-      return { profile: null, error: profileError };
+    if (musicianRes.error) {
+      return { profile: null, error: musicianRes.error };
     }
 
-    return { profile, error: null };
+    const m = musicianRes.data;
+    const displayName =
+      m.artist_name?.trim() ||
+      m.username?.trim() ||
+      [m.first_name, m.last_name].filter(Boolean).join(" ").trim() ||
+      "Musician";
+
+    return {
+      profile: {
+        ...m,
+        artistName: displayName,
+        name: displayName,
+        genre: m.genres?.trim() || "",
+        avatar_url: profileRes.data?.avatar_url ?? null,
+      },
+      error: null,
+    };
   } catch (error) {
     console.error("Error getting musician profile by ID:", error);
     return { profile: null, error: { message: error.message } };

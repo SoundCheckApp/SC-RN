@@ -23,7 +23,10 @@ import { signOut } from "../../utils/auth";
 import {
   CONSUMER_BIO_MAX_LENGTH,
   CONSUMER_GENRE_OPTIONS,
+  CONSUMER_MAX_GENRE_PICKS,
   getConsumerAccountForSettings,
+  parsePreferredGenresFromStorage,
+  serializePreferredGenres,
   updateConsumerEditableAccount,
 } from "../../utils/consumer";
 import { uploadMusicianAvatar } from "../../utils/musician";
@@ -40,7 +43,7 @@ export default function SettingsScreen() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [location, setLocation] = useState("");
-  const [preferredGenre, setPreferredGenre] = useState("");
+  const [selectedGenres, setSelectedGenres] = useState([]);
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState(null);
 
@@ -64,7 +67,7 @@ export default function SettingsScreen() {
       setEmail(data.email ?? "");
       setUsername(data.username ?? "");
       setLocation(data.location ?? "");
-      setPreferredGenre((data.preferred_genre ?? "").trim());
+      setSelectedGenres(parsePreferredGenresFromStorage(data.preferred_genre));
       setBio(data.bio ?? "");
       setAvatarUrl(data.avatar_url ?? null);
     } finally {
@@ -126,11 +129,10 @@ export default function SettingsScreen() {
     setSaving(true);
     try {
       const { error } = await updateConsumerEditableAccount({
-        firstName,
-        lastName,
+        email: email.trim(),
         username,
         location,
-        preferredGenre,
+        preferredGenre: serializePreferredGenres(selectedGenres),
         bio,
       });
       if (error) {
@@ -169,6 +171,22 @@ export default function SettingsScreen() {
 
   const onBioChange = (text) => {
     if (text.length <= CONSUMER_BIO_MAX_LENGTH) setBio(text);
+  };
+
+  const toggleGenre = (g) => {
+    setSelectedGenres((prev) => {
+      if (prev.includes(g)) {
+        return prev.filter((x) => x !== g);
+      }
+      if (prev.length >= CONSUMER_MAX_GENRE_PICKS) {
+        Alert.alert(
+          "Limit reached",
+          `You can select up to ${CONSUMER_MAX_GENRE_PICKS} genres.`
+        );
+        return prev;
+      }
+      return [...prev, g];
+    });
   };
 
   if (loading) {
@@ -241,36 +259,36 @@ export default function SettingsScreen() {
             <View style={styles.half}>
               <Text style={styles.label}>First Name</Text>
               <TextInput
-                style={[styles.input, styles.inputEditable]}
+                style={[styles.input, styles.inputReadOnly]}
                 value={firstName}
-                onChangeText={setFirstName}
-                placeholder="First name"
-                placeholderTextColor="#6B7280"
-                autoCapitalize="words"
+                editable={false}
+                selectTextOnFocus={false}
+                placeholderTextColor="#9CA3AF"
               />
             </View>
             <View style={styles.half}>
               <Text style={styles.label}>Last Name</Text>
               <TextInput
-                style={[styles.input, styles.inputEditable]}
+                style={[styles.input, styles.inputReadOnly]}
                 value={lastName}
-                onChangeText={setLastName}
-                placeholder="Last name"
-                placeholderTextColor="#6B7280"
-                autoCapitalize="words"
+                editable={false}
+                selectTextOnFocus={false}
+                placeholderTextColor="#9CA3AF"
               />
             </View>
           </View>
 
           <Text style={styles.label}>Email</Text>
           <TextInput
-            style={[styles.input, styles.inputEmailLocked]}
+            style={[styles.input, styles.inputEditable]}
             value={email}
-            editable={false}
-            selectTextOnFocus={false}
-            placeholderTextColor="#9CA3AF"
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="your@email.com"
+            placeholderTextColor="#6B7280"
           />
-          <Text style={styles.emailHelper}>Email cannot be changed</Text>
 
           <Text style={styles.label}>Username</Text>
           <TextInput
@@ -292,7 +310,10 @@ export default function SettingsScreen() {
             autoCapitalize="words"
           />
 
-          <Text style={styles.label}>Preferred Genre</Text>
+          <Text style={styles.label}>Preferred Genres</Text>
+          <Text style={styles.genreHint}>
+            Up to {CONSUMER_MAX_GENRE_PICKS} — tap to add or remove
+          </Text>
           <TouchableOpacity
             style={[styles.input, styles.genreTrigger]}
             onPress={() => setShowGenreModal(true)}
@@ -301,12 +322,15 @@ export default function SettingsScreen() {
             <Text
               style={[
                 styles.genreTriggerText,
-                !preferredGenre && styles.genrePlaceholder,
+                selectedGenres.length === 0 && styles.genrePlaceholder,
               ]}
+              numberOfLines={2}
             >
-              {preferredGenre || "Select"}
+              {selectedGenres.length
+                ? selectedGenres.join(", ")
+                : "Select up to 3 genres"}
             </Text>
-            <Ionicons name="chevron-down" size={20} color="#FFFFFF" />
+            <Ionicons name="chevron-down" size={20} color="#111827" />
           </TouchableOpacity>
 
           <Text style={styles.label}>Bio</Text>
@@ -356,39 +380,54 @@ export default function SettingsScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Preferred Genre</Text>
-              <TouchableOpacity
-                onPress={() => setShowGenreModal(false)}
-                style={styles.modalCloseButton}
-              >
-                <Ionicons name="close" size={24} color="#FFFFFF" />
-              </TouchableOpacity>
+            <View style={styles.modalHeaderCol}>
+              <View style={styles.modalHeaderRow}>
+                <View style={styles.modalTitleBlock}>
+                  <Text style={styles.modalTitle}>Preferred Genres</Text>
+                  <Text style={styles.modalSubtitle}>
+                    {selectedGenres.length}/{CONSUMER_MAX_GENRE_PICKS} selected
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowGenreModal(false)}
+                  style={styles.modalCloseButton}
+                >
+                  <Ionicons name="close" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
             </View>
             <FlatList
               data={CONSUMER_GENRE_OPTIONS}
               keyExtractor={(item) => item}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.genreItem,
-                    preferredGenre === item && styles.genreItemSelected,
-                  ]}
-                  onPress={() => {
-                    setPreferredGenre(item);
-                    setShowGenreModal(false);
-                  }}
-                >
-                  <Text
+              renderItem={({ item }) => {
+                const selected = selectedGenres.includes(item);
+                return (
+                  <TouchableOpacity
                     style={[
-                      styles.genreText,
-                      preferredGenre === item && styles.genreTextSelected,
+                      styles.genreItem,
+                      selected && styles.genreItemSelected,
                     ]}
+                    onPress={() => toggleGenre(item)}
+                    activeOpacity={0.7}
                   >
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              )}
+                    <View style={styles.genreItemInner}>
+                      <Ionicons
+                        name={selected ? "checkmark-circle" : "ellipse-outline"}
+                        size={22}
+                        color={selected ? "#A855F7" : "#9CA3AF"}
+                      />
+                      <Text
+                        style={[
+                          styles.genreText,
+                          selected && styles.genreTextSelected,
+                        ]}
+                      >
+                        {item}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
             />
           </View>
         </View>
@@ -490,16 +529,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     color: "#111827",
   },
-  inputEmailLocked: {
+  inputReadOnly: {
     backgroundColor: "#2C2C2E",
     color: "#FFFFFF",
-    marginBottom: 6,
   },
-  emailHelper: {
-    fontSize: 13,
-    color: "#6B7280",
-    marginTop: -10,
-    marginBottom: 16,
+  genreHint: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    marginTop: -4,
+    marginBottom: 8,
   },
   rowTwo: {
     flexDirection: "row",
@@ -583,13 +621,26 @@ const styles = StyleSheet.create({
     maxHeight: "70%",
     paddingBottom: 40,
   },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
+  modalHeaderCol: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#374151",
+  },
+  modalHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  modalTitleBlock: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: "#9CA3AF",
+    marginTop: 4,
   },
   modalTitle: {
     fontSize: 18,
@@ -600,10 +651,15 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   genreItem: {
-    paddingVertical: 16,
+    paddingVertical: 14,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: "#374151",
+  },
+  genreItemInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
   genreItemSelected: {
     backgroundColor: "#E5E7EB",
@@ -611,6 +667,7 @@ const styles = StyleSheet.create({
   genreText: {
     fontSize: 16,
     color: "#FFFFFF",
+    flex: 1,
   },
   genreTextSelected: {
     color: "#000000",
