@@ -1,48 +1,108 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
-import { getMusicianProfile } from "../../utils/musician";
+import { getCurrentCoordinates } from "../../utils/location";
+import { getMusicianProfile, setMusicianLiveStatus } from "../../utils/musician";
 
 export default function MusicianHomepage() {
   const [balance, setBalance] = useState(0.0);
   const [isLive, setIsLive] = useState(false);
+  const [isTogglingLive, setIsTogglingLive] = useState(false);
 
-  useEffect(() => {
-    // Load balance from database
-    loadBalance();
-  }, []);
-
-  const loadBalance = async () => {
+  const loadBalance = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) {
-        // TODO: Fetch balance from musicians table or tips table
-        // For now, using default value
-        const { profile } = await getMusicianProfile();
-        // If balance is stored in profile, set it here
-        // setBalance(profile?.balance || 0.0);
+        await getMusicianProfile();
       }
     } catch (error) {
       console.error("Error loading balance:", error);
     }
-  };
+  }, []);
 
-  const handleGoLive = () => {
-    // TODO: Implement go live functionality
-    // This should:
-    // 1. Get user's current location
-    // 2. Set musician status to "live"
-    // 3. Alert supporters in local area
-    setIsLive(!isLive);
-    console.log("Go Live pressed - Status:", !isLive ? "LIVE" : "OFFLINE");
+  const loadLiveStatus = useCallback(async () => {
+    const { profile, error } = await getMusicianProfile();
+    if (error) {
+      console.error("Error loading live status:", error);
+      return;
+    }
+    setIsLive(Boolean(profile?.is_live));
+  }, []);
+
+  useEffect(() => {
+    loadBalance();
+    loadLiveStatus();
+  }, [loadBalance, loadLiveStatus]);
+
+  const handleGoLive = async () => {
+    if (isTogglingLive) return;
+
+    const goingLive = !isLive;
+    setIsTogglingLive(true);
+
+    try {
+      if (goingLive) {
+        const { coords, error: locError } = await getCurrentCoordinates();
+        if (locError || !coords) {
+          Alert.alert(
+            "Location required",
+            locError?.message ??
+              "Enable location access to go live and appear on the map."
+          );
+          return;
+        }
+
+        const { error } = await setMusicianLiveStatus(
+          true,
+          coords.latitude,
+          coords.longitude
+        );
+
+        if (error) {
+          const msg = error.message ?? "Could not go live.";
+          if (
+            msg.includes("latitude") ||
+            msg.includes("is_live") ||
+            error.code === "42703"
+          ) {
+            Alert.alert(
+              "Database setup needed",
+              "Run supabase_musicians_live_location.sql in your Supabase SQL editor, then try again."
+            );
+          } else {
+            Alert.alert("Go live failed", msg);
+          }
+          return;
+        }
+
+        setIsLive(true);
+      } else {
+        const { error } = await setMusicianLiveStatus(false);
+        if (error) {
+          Alert.alert("Could not go offline", error.message ?? "Try again.");
+          return;
+        }
+        setIsLive(false);
+      }
+    } finally {
+      setIsTogglingLive(false);
+    }
   };
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.content}>
-        {/* Balance Section */}
         <View style={styles.balanceContainer}>
           <View style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>BALANCE</Text>
@@ -50,17 +110,37 @@ export default function MusicianHomepage() {
           </View>
         </View>
 
-        {/* Go Live Section */}
         <View style={styles.goLiveSection}>
           <View style={styles.locationPinContainer}>
-            <Ionicons name="location" size={80} color="#FF6B35" style={styles.locationPin} />
+            <Ionicons
+              name="location"
+              size={80}
+              color={isLive ? "#10B981" : "#FF6B35"}
+              style={styles.locationPin}
+            />
           </View>
+          {isLive && (
+            <Text style={styles.liveStatusText}>
+              You are live on the map for nearby fans.
+            </Text>
+          )}
           <TouchableOpacity
-            style={[styles.goLiveButton, isLive && styles.goLiveButtonActive]}
+            style={[
+              styles.goLiveButton,
+              isLive && styles.goLiveButtonActive,
+              isTogglingLive && styles.goLiveButtonDisabled,
+            ]}
             onPress={handleGoLive}
             activeOpacity={0.8}
+            disabled={isTogglingLive}
           >
-            <Text style={styles.goLiveButtonText}>GO LIVE!</Text>
+            {isTogglingLive ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.goLiveButtonText}>
+                {isLive ? "GO OFFLINE" : "GO LIVE!"}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -113,7 +193,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   locationPinContainer: {
-    marginBottom: 40,
+    marginBottom: 24,
     position: "relative",
   },
   locationPin: {
@@ -121,12 +201,20 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 20,
   },
+  liveStatusText: {
+    color: "#10B981",
+    fontSize: 14,
+    marginBottom: 20,
+    textAlign: "center",
+    paddingHorizontal: 16,
+  },
   goLiveButton: {
     backgroundColor: "#FF6B35",
     borderRadius: 30,
     paddingVertical: 16,
     paddingHorizontal: 48,
     minWidth: 200,
+    minHeight: 52,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#FF6B35",
@@ -136,8 +224,11 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   goLiveButtonActive: {
-    backgroundColor: "#10B981",
-    shadowColor: "#10B981",
+    backgroundColor: "#374151",
+    shadowColor: "#374151",
+  },
+  goLiveButtonDisabled: {
+    opacity: 0.7,
   },
   goLiveButtonText: {
     fontSize: 18,

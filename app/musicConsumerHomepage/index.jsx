@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import * as Location from "expo-location";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -12,7 +11,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import NearbyMusiciansMap from "../../components/NearbyMusiciansMap";
 import { getNearbyLiveMusicians } from "../../utils/consumer";
+import { getCurrentCoordinates } from "../../utils/location";
 import {
   probeMusicianDiscoveryAccess,
   searchMusicians,
@@ -77,26 +78,17 @@ export default function MusicConsumerHomepage() {
   const loadNearbyMusicians = useCallback(async () => {
     setIsLoadingNearby(true);
     setLocationError(null);
+
     try {
-      let coords = userLocation;
-
-      if (!coords) {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
-          setLocationError("Location permission is required to find nearby musicians.");
-          setNearbyMusicians([]);
-          return;
-        }
-
-        const position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        coords = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        };
-        setUserLocation(coords);
+      const { coords, error: locError } = await getCurrentCoordinates();
+      if (locError || !coords) {
+        setUserLocation(null);
+        setNearbyMusicians([]);
+        setLocationError(locError?.message ?? "Location unavailable.");
+        return;
       }
+
+      setUserLocation(coords);
 
       const { musicians, error } = await getNearbyLiveMusicians(
         coords.latitude,
@@ -105,7 +97,18 @@ export default function MusicConsumerHomepage() {
       );
 
       if (error) {
-        console.error("Error loading nearby musicians:", error);
+        console.error("getNearbyLiveMusicians:", error);
+        if (
+          error.message?.includes("latitude") ||
+          error.message?.includes("is_live") ||
+          error.code === "42703"
+        ) {
+          setLocationError(
+            "Map database is not ready. Run supabase_musicians_live_location.sql in Supabase."
+          );
+        } else {
+          setLocationError(error.message ?? "Could not load nearby musicians.");
+        }
         setNearbyMusicians([]);
         return;
       }
@@ -113,11 +116,11 @@ export default function MusicConsumerHomepage() {
       setNearbyMusicians(musicians);
     } catch (error) {
       console.error("Error loading nearby musicians:", error);
-      setNearbyMusicians([]);
+      setLocationError("Something went wrong loading nearby musicians.");
     } finally {
       setIsLoadingNearby(false);
     }
-  }, [radius, userLocation]);
+  }, [radius]);
 
   useEffect(() => {
     loadNearbyMusicians();
@@ -171,9 +174,9 @@ export default function MusicConsumerHomepage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const handleMarkerPress = (musician) => {
-    setSelectedMusician(musician.id);
-    const index = nearbyMusicians.findIndex((m) => m.id === musician.id);
+  const handleMarkerPress = ({ id }) => {
+    setSelectedMusician(id);
+    const index = nearbyMusicians.findIndex((m) => m.id === id);
     if (index !== -1 && scrollViewRef.current) {
       scrollViewRef.current.scrollTo({ y: index * 100, animated: true });
     }
@@ -184,6 +187,10 @@ export default function MusicConsumerHomepage() {
   };
 
   const showSearchResults = searchQuery.trim().length >= 2;
+
+  const handleRetryLocation = () => {
+    loadNearbyMusicians();
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -250,36 +257,25 @@ export default function MusicConsumerHomepage() {
         </View>
 
         <View style={styles.mapContainer}>
-          <View style={styles.mapPlaceholder}>
-            <Text style={styles.mapText}>
-              {locationError ||
-                `Map showing live musicians within ${radius} miles`}
-            </Text>
-
-            {userLocation && (
-              <View style={styles.userMarker}>
-                <Ionicons name="location" size={24} color="#3B82F6" />
-                <View style={styles.userMarkerCircle} />
-              </View>
-            )}
-
-            {nearbyMusicians.map((musician, index) => (
+          {locationError ? (
+            <View style={styles.locationErrorBox}>
+              <Text style={styles.locationErrorText}>{locationError}</Text>
               <TouchableOpacity
-                key={musician.id}
-                style={[
-                  styles.musicianMarker,
-                  {
-                    left: `${30 + index * 20}%`,
-                    top: `${40 + index * 15}%`,
-                  },
-                  selectedMusician === musician.id && styles.musicianMarkerSelected,
-                ]}
-                onPress={() => handleMarkerPress(musician)}
+                style={styles.retryButton}
+                onPress={handleRetryLocation}
               >
-                <View style={styles.musicianMarkerDot} />
+                <Text style={styles.retryButtonText}>Try again</Text>
               </TouchableOpacity>
-            ))}
-          </View>
+            </View>
+          ) : (
+            <NearbyMusiciansMap
+              userLocation={userLocation}
+              musicians={nearbyMusicians}
+              radiusMiles={radius}
+              selectedMusicianId={selectedMusician}
+              onMarkerPress={handleMarkerPress}
+            />
+          )}
         </View>
 
         <ScrollView
@@ -425,53 +421,30 @@ const styles = StyleSheet.create({
     height: 220,
     marginBottom: 16,
   },
-  mapPlaceholder: {
+  locationErrorBox: {
     flex: 1,
     backgroundColor: "#374151",
     borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
-    position: "relative",
-    overflow: "hidden",
+    padding: 20,
   },
-  mapText: {
+  locationErrorText: {
     fontSize: 14,
-    color: "#9CA3AF",
+    color: "#FCA5A5",
     textAlign: "center",
     paddingHorizontal: 16,
-    zIndex: 1,
+    marginBottom: 12,
   },
-  userMarker: {
-    position: "absolute",
-    top: "45%",
-    left: "45%",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 10,
-  },
-  userMarkerCircle: {
-    position: "absolute",
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "rgba(59, 130, 246, 0.2)",
-    borderWidth: 2,
-    borderColor: "#3B82F6",
-  },
-  musicianMarker: {
-    position: "absolute",
-    zIndex: 5,
-  },
-  musicianMarkerSelected: {
-    zIndex: 15,
-  },
-  musicianMarkerDot: {
-    width: 16,
-    height: 16,
+  retryButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: "#A855F7",
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
+    backgroundColor: "#4F46E5",
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
   listContainer: {
     flex: 1,

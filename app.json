@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "sc-app",
-    "slug": "sc-app",
+    "slug": "soundcheckapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -9,7 +9,12 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.soundcheck.musicapp",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "SoundCheck uses your location to show nearby live musicians and when you go live."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +24,18 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCDagwiapqtCM48_AJTpx_QRVPHAPatQLk"
+        }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "package": "com.soundcheck.musicapp"
     },
     "web": {
       "output": "static",
@@ -52,11 +68,25 @@
           }
         }
       ],
+      [
+        "expo-maps",
+        {
+          "requestLocationPermission": true,
+          "locationPermission": "Allow $(SoundCheck) to use your location"
+        }
+      ],
       "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9b4e08db-e680-4e53-b8d3-e26970eaa97a"
+      }
+    },
+    "owner": "soundcheckmusicapp"
   }
 }

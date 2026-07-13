@@ -420,6 +420,28 @@ export const getNearbyLiveMusicians = async (latitude, longitude, radiusMiles) =
 };
 
 /**
+ * Map a live musician row to the consumer homepage list/map shape.
+ */
+export const formatLiveMusicianForUI = (row) => {
+  const genre =
+    typeof row.genres === "string" && row.genres.trim()
+      ? row.genres.split(",")[0].trim()
+      : "";
+
+  return {
+    id: row.id,
+    name: row.artist_name?.trim() || row.username?.trim() || "Musician",
+    genre,
+    location: {
+      lat: row.latitude,
+      lng: row.longitude,
+    },
+    distance: row.distance ?? null,
+    isOfficial: false,
+  };
+};
+
+/**
  * Calculate distance between two coordinates using Haversine formula
  * @param {number} lat1 - First latitude
  * @param {number} lon1 - First longitude

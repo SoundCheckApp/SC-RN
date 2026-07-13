@@ -128,6 +128,54 @@ export const saveMusicianProfile = async (profileData) => {
  * Get musician profile
  * @returns {Promise<{profile: object|null, error: object|null}>}
  */
+/**
+ * Turn live on/off and persist map coordinates for nearby discovery.
+ * @param {boolean} isLive
+ * @param {number | null} latitude
+ * @param {number | null} longitude
+ */
+export const setMusicianLiveStatus = async (isLive, latitude = null, longitude = null) => {
+  try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { error: { message: "User not authenticated" } };
+    }
+
+    if (isLive && (latitude == null || longitude == null)) {
+      return { error: { message: "Location is required to go live." } };
+    }
+
+    const payload = isLive
+      ? {
+          is_live: true,
+          latitude,
+          longitude,
+          live_started_at: new Date().toISOString(),
+        }
+      : {
+          is_live: false,
+          latitude: null,
+          longitude: null,
+          live_started_at: null,
+        };
+
+    const { error } = await supabase.from("musicians").update(payload).eq("id", user.id);
+
+    if (error) {
+      return { error };
+    }
+
+    return { error: null };
+  } catch (error) {
+    console.error("setMusicianLiveStatus:", error);
+    return { error: { message: error.message } };
+  }
+};
+
 export const getMusicianProfile = async () => {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
